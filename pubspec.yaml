@@ -1,0 +1,31 @@
+name: synheart_focus
+description: On-device cognitive concentration inference from biosignals and behavioral patterns for Flutter.
+version: 0.1.0
+homepage: https://github.com/synheart-ai/synheart-focus
+repository: https://github.com/synheart-ai/synheart-focus
+issue_tracker: https://github.com/synheart-ai/synheart-focus/issues
+license: Apache-2.0
+topics:
+  - focus
+  - cognition
+  - biosignals
+  - machine-learning
+  - flutter
+  - health
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+
