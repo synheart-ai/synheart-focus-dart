@@ -20,6 +20,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_onnxruntime: ^1.5.2
 
 dev_dependencies:
   flutter_test:
@@ -28,4 +29,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/models/
 
