@@ -1,3 +1,6 @@
+// Re-export ModelInfo from models directory
+export 'models/on_device_model.dart' show ModelInfo;
+
 /// Human-Signal Interface (HSI) data from biosignals
 class HSIData {
   /// Heart rate in beats per minute

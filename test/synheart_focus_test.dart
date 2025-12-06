@@ -6,7 +6,7 @@ void main() {
     late FocusEngine engine;
 
     setUp(() {
-      engine = FocusEngine.initialize();
+      engine = FocusEngine();
     });
 
     tearDown(() {

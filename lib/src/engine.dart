@@ -1,26 +1,137 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'scorer.dart';
 import 'config.dart';
+import 'models/on_device_model.dart';
+import 'models/model_factory.dart';
+import 'models/onnx_runtime.dart';
+import 'feature_extractor.dart';
 import 'models.dart';
 
 /// Core engine for cognitive concentration inference
+/// 
+/// Merges functionality from both focus-core-dart and synheart-focus-dart
 class FocusEngine {
   final FocusConfig config;
-  final StreamController<FocusState> _updateController;
-  double? _previousFocusScore;
+  
+  double? _previousScore;
+  DateTime _lastUpdate = DateTime.now().toUtc();
+  
+  /// Callback for logging/debugging
+  void Function(String level, String message, {Map<String, dynamic>? context})? onLog;
 
-  FocusEngine._({required this.config})
-      : _updateController = StreamController<FocusState>.broadcast();
+  /// Model for inference
+  OnDeviceModel? _model;
+  
+  /// Feature extractor
+  final FeatureExtractor _featureExtractor = FeatureExtractor();
 
-  /// Initialize the FocusEngine with optional configuration
-  factory FocusEngine.initialize({FocusConfig? config}) {
-    return FocusEngine._(config: config ?? const FocusConfig());
-  }
+  /// Stream controller for updates (from synheart-focus-dart)
+  final StreamController<FocusState> _updateController = StreamController<FocusState>.broadcast();
 
-  /// Stream of focus state updates
+  FocusEngine({
+    FocusConfig? config,
+    this.onLog,
+  }) : config = config ?? FocusConfig.defaultConfig;
+
+  /// Stream of focus state updates (from synheart-focus-dart)
   Stream<FocusState> get onUpdate => _updateController.stream;
 
-  /// Perform inference on input data
+  /// Initialize the engine with a model
+  Future<void> initialize({
+    String? modelPath,
+    String backend = 'onnx',
+  }) async {
+    try {
+      final modelRef = modelPath ?? 'assets/models/cnn_lstm_top_6_features.onnx';
+      _model = await ModelFactory.load(
+        backend: backend,
+        modelRef: modelRef,
+      );
+      _log('info', 'Model loaded: ${_model!.info.id}');
+    } catch (e) {
+      _log('error', 'Failed to load model: $e');
+      rethrow;
+    }
+  }
+
+  /// Compute Focus Score from model probabilities
+  /// 
+  /// Uses linear composite algorithm: maps model probabilities to Focus Score (0-100)
+  /// Matching Python SDK FocusResult.from_inference() approach
+  /// 
+  /// Focus Score calculation (linear composite):
+  /// - Focused: 70.0 + (confidence * 30.0) → 70-100
+  /// - time pressure: 40.0 + (confidence * 30.0) → 40-70
+  /// - Distracted: confidence * 40.0 → 0-40
+  FocusResult computeScore({
+    required Map<String, double> probabilities, // All class probabilities from model
+    required Map<String, double> features, // Extracted features
+    required ModelInfo modelInfo, // Model metadata
+  }) {
+    // Create result using linear composite algorithm (matching Python SDK)
+    final result = FocusResult.fromInference(
+      timestamp: DateTime.now().toUtc(),
+      probabilities: probabilities,
+      features: features,
+      model: {
+        'id': modelInfo.id,
+        'version': '1.0',
+        'type': modelInfo.type,
+        'labels': modelInfo.classNames ?? ['Focused', 'time pressure', 'Distracted'],
+        'feature_names': modelInfo.inputSchema,
+        'num_classes': (modelInfo.classNames ?? []).length,
+        'num_features': modelInfo.inputSchema.length,
+      },
+    );
+    
+    // Apply smoothing if enabled
+    double finalScore = result.focusScore;
+    if (config.enableSmoothing && _previousScore != null) {
+      finalScore = _smoothScore(
+        result.focusScore,
+        _previousScore!,
+        lambda: config.smoothingLambda,
+      );
+      _previousScore = finalScore;
+    } else {
+      _previousScore = finalScore;
+    }
+    
+    // Log the computation
+    _log('info', 'Computed Focus score: ${finalScore.toStringAsFixed(1)}, '
+                  'state: ${result.focusState}, '
+                  'confidence: ${(result.confidence * 100).toStringAsFixed(1)}%');
+    
+    // Update timestamp
+    _lastUpdate = DateTime.now().toUtc();
+    
+    // Emit update to stream (synheart-focus-dart compatibility)
+    final focusState = FocusState(
+      focusScore: finalScore / 100.0, // Convert 0-100 to 0-1
+      focusLabel: _getFocusLabel(finalScore / 100.0),
+      confidence: result.confidence,
+      timestamp: result.timestamp,
+      metadata: {
+        'probabilities': result.probabilities,
+        'features': result.features,
+      },
+    );
+    _updateController.add(focusState);
+    
+    // Return result with smoothed score
+    return FocusResult(
+      timestamp: result.timestamp,
+      focusState: result.focusState,
+      focusScore: finalScore,
+      confidence: result.confidence,
+      probabilities: result.probabilities,
+      features: result.features,
+      model: result.model,
+    );
+  }
+
+  /// Perform inference on input data (from synheart-focus-dart)
   Future<FocusState> infer(HSIData hsiData, BehaviorData behaviorData) async {
     // Calculate HSI-based focus score
     final hsiScore = _calculateHSIScore(hsiData);
@@ -33,12 +144,12 @@ class FocusEngine {
         (hsiScore * config.hsiWeight) + (behaviorScore * config.behaviorWeight);
 
     // Apply temporal smoothing if we have previous data
-    final smoothedScore = _previousFocusScore != null
+    final smoothedScore = _previousScore != null
         ? (rawScore * (1 - config.smoothingFactor)) +
-            (_previousFocusScore! * config.smoothingFactor)
+            (_previousScore! / 100.0 * config.smoothingFactor)
         : rawScore;
 
-    _previousFocusScore = smoothedScore;
+    _previousScore = smoothedScore * 100.0;
 
     // Clamp to valid range
     final focusScore = smoothedScore.clamp(0.0, 1.0);
@@ -62,8 +173,7 @@ class FocusEngine {
     );
 
     if (config.enableDebugLogging) {
-      // ignore: avoid_print
-      print('[FocusEngine] $focusState');
+      _log('debug', '[FocusEngine] $focusState');
     }
 
     // Emit update
@@ -72,7 +182,63 @@ class FocusEngine {
     return focusState;
   }
 
-  /// Calculate focus score from HSI data
+  /// Perform inference using ONNX model (from focus-core-dart)
+  Future<FocusResult?> inferFromRrIntervals({
+    required List<double> rrIntervalsMs,
+    required double hrMean,
+    double? motionMagnitude,
+  }) async {
+    if (_model == null) {
+      throw Exception('Model not initialized. Call initialize() first.');
+    }
+
+    // Extract features
+    final featureVector = _featureExtractor.toFeatures(
+      rrIntervalsMs: rrIntervalsMs,
+      hrMean: hrMean,
+      motionMagnitude: motionMagnitude,
+    );
+
+    if (featureVector == null) {
+      _log('warning', 'Failed to extract features - insufficient data');
+      return null;
+    }
+
+    // Check minimum RR count
+    if (rrIntervalsMs.length < config.minRrCount) {
+      _log('warning', 'Insufficient RR intervals: ${rrIntervalsMs.length} < ${config.minRrCount}');
+      return null;
+    }
+
+    // Get probabilities from model
+    Map<String, double> probabilities;
+    if (_model is ONNXRuntimeModel) {
+      final onnxModel = _model as ONNXRuntimeModel;
+      probabilities = await onnxModel.predictProbabilities(featureVector.values);
+    } else {
+      // Fallback for other model types
+      final prob = await _model!.predict(featureVector.values);
+      probabilities = {
+        'Focused': prob,
+        'time pressure': (1.0 - prob) / 2.0,
+        'Distracted': (1.0 - prob) / 2.0,
+      };
+    }
+
+    // Compute score
+    return computeScore(
+      probabilities: probabilities,
+      features: featureVector.namedFeatures,
+      modelInfo: _model!.info,
+    );
+  }
+
+  /// Smooth score using exponential moving average
+  double _smoothScore(double current, double previous, {double lambda = 0.9}) {
+    return lambda * current + (1.0 - lambda) * previous;
+  }
+
+  /// Calculate focus score from HSI data (from synheart-focus-dart)
   double _calculateHSIScore(HSIData data) {
     // Normalize HR (assuming optimal focus HR is 60-80 bpm)
     final hrNormalized = _normalizeHR(data.hr);
@@ -115,7 +281,7 @@ class FocusEngine {
     }
   }
 
-  /// Calculate focus score from behavior data
+  /// Calculate focus score from behavior data (from synheart-focus-dart)
   double _calculateBehaviorScore(BehaviorData data) {
     // Lower task switching indicates sustained focus
     final taskSwitchScore = math.max(0.0, 1.0 - (data.taskSwitchRate / 2.0));
@@ -163,13 +329,61 @@ class FocusEngine {
     }
   }
 
-  /// Reset the engine state
+  /// Get interpretation of a score
+  String interpretScore(double score) {
+    if (score >= 80.0) {
+      return 'Highly Focused';
+    } else if (score >= 60.0) {
+      return 'Focused';
+    } else if (score >= 40.0) {
+      return 'Moderately Focused';
+    } else if (score >= 20.0) {
+      return 'Distracted';
+    } else {
+      return 'Very Distracted';
+    }
+  }
+
+  /// Reset engine state
   void reset() {
-    _previousFocusScore = null;
+    _previousScore = null;
+    _lastUpdate = DateTime.now().toUtc();
+    _log('info', 'Engine reset');
+  }
+
+  /// Log message
+  void _log(String level, String message, {Map<String, dynamic>? context}) {
+    onLog?.call(level, message, context: context);
+  }
+
+  /// Get current state
+  Map<String, dynamic> getState() {
+    return {
+      'config': config.toJson(),
+      'previous_score': _previousScore,
+      'last_update': _lastUpdate.toIso8601String(),
+      'model_loaded': _model != null,
+    };
   }
 
   /// Dispose of resources
   void dispose() {
     _updateController.close();
+    _model?.dispose();
+  }
+}
+
+/// Factory for creating Focus Engines with sensible defaults
+class FocusEngineFactory {
+  /// Create engine with default configuration
+  /// Uses linear composite algorithm matching Python SDK
+  static FocusEngine createDefault({
+    FocusConfig? config,
+    void Function(String level, String message, {Map<String, dynamic>? context})? onLog,
+  }) {
+    return FocusEngine(
+      config: config,
+      onLog: onLog,
+    );
   }
 }
