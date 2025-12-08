@@ -19,4 +19,3 @@ class WindowBuffer<T> {
     return null;
   }
 }
-

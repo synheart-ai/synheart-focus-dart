@@ -9,25 +9,27 @@ import 'feature_extractor.dart';
 import 'models.dart';
 
 /// Core engine for cognitive concentration inference
-/// 
+///
 /// Merges functionality from both focus-core-dart and synheart-focus-dart
 class FocusEngine {
   final FocusConfig config;
-  
+
   double? _previousScore;
   DateTime _lastUpdate = DateTime.now().toUtc();
-  
+
   /// Callback for logging/debugging
-  void Function(String level, String message, {Map<String, dynamic>? context})? onLog;
+  void Function(String level, String message, {Map<String, dynamic>? context})?
+      onLog;
 
   /// Model for inference
   OnDeviceModel? _model;
-  
+
   /// Feature extractor
   final FeatureExtractor _featureExtractor = FeatureExtractor();
 
   /// Stream controller for updates (from synheart-focus-dart)
-  final StreamController<FocusState> _updateController = StreamController<FocusState>.broadcast();
+  final StreamController<FocusState> _updateController =
+      StreamController<FocusState>.broadcast();
 
   FocusEngine({
     FocusConfig? config,
@@ -43,7 +45,8 @@ class FocusEngine {
     String backend = 'onnx',
   }) async {
     try {
-      final modelRef = modelPath ?? 'assets/models/cnn_lstm_top_6_features.onnx';
+      final modelRef =
+          modelPath ?? 'assets/models/cnn_lstm_top_6_features.onnx';
       _model = await ModelFactory.load(
         backend: backend,
         modelRef: modelRef,
@@ -56,16 +59,17 @@ class FocusEngine {
   }
 
   /// Compute Focus Score from model probabilities
-  /// 
+  ///
   /// Uses linear composite algorithm: maps model probabilities to Focus Score (0-100)
   /// Matching Python SDK FocusResult.from_inference() approach
-  /// 
+  ///
   /// Focus Score calculation (linear composite):
   /// - Focused: 70.0 + (confidence * 30.0) → 70-100
   /// - time pressure: 40.0 + (confidence * 30.0) → 40-70
   /// - Distracted: confidence * 40.0 → 0-40
   FocusResult computeScore({
-    required Map<String, double> probabilities, // All class probabilities from model
+    required Map<String, double>
+        probabilities, // All class probabilities from model
     required Map<String, double> features, // Extracted features
     required ModelInfo modelInfo, // Model metadata
   }) {
@@ -78,13 +82,14 @@ class FocusEngine {
         'id': modelInfo.id,
         'version': '1.0',
         'type': modelInfo.type,
-        'labels': modelInfo.classNames ?? ['Focused', 'time pressure', 'Distracted'],
+        'labels':
+            modelInfo.classNames ?? ['Focused', 'time pressure', 'Distracted'],
         'feature_names': modelInfo.inputSchema,
         'num_classes': (modelInfo.classNames ?? []).length,
         'num_features': modelInfo.inputSchema.length,
       },
     );
-    
+
     // Apply smoothing if enabled
     double finalScore = result.focusScore;
     if (config.enableSmoothing && _previousScore != null) {
@@ -97,15 +102,17 @@ class FocusEngine {
     } else {
       _previousScore = finalScore;
     }
-    
+
     // Log the computation
-    _log('info', 'Computed Focus score: ${finalScore.toStringAsFixed(1)}, '
-                  'state: ${result.focusState}, '
-                  'confidence: ${(result.confidence * 100).toStringAsFixed(1)}%');
-    
+    _log(
+        'info',
+        'Computed Focus score: ${finalScore.toStringAsFixed(1)}, '
+            'state: ${result.focusState}, '
+            'confidence: ${(result.confidence * 100).toStringAsFixed(1)}%');
+
     // Update timestamp
     _lastUpdate = DateTime.now().toUtc();
-    
+
     // Emit update to stream (synheart-focus-dart compatibility)
     final focusState = FocusState(
       focusScore: finalScore / 100.0, // Convert 0-100 to 0-1
@@ -118,7 +125,7 @@ class FocusEngine {
       },
     );
     _updateController.add(focusState);
-    
+
     // Return result with smoothed score
     return FocusResult(
       timestamp: result.timestamp,
@@ -206,7 +213,8 @@ class FocusEngine {
 
     // Check minimum RR count
     if (rrIntervalsMs.length < config.minRrCount) {
-      _log('warning', 'Insufficient RR intervals: ${rrIntervalsMs.length} < ${config.minRrCount}');
+      _log('warning',
+          'Insufficient RR intervals: ${rrIntervalsMs.length} < ${config.minRrCount}');
       return null;
     }
 
@@ -214,7 +222,8 @@ class FocusEngine {
     Map<String, double> probabilities;
     if (_model is ONNXRuntimeModel) {
       final onnxModel = _model as ONNXRuntimeModel;
-      probabilities = await onnxModel.predictProbabilities(featureVector.values);
+      probabilities =
+          await onnxModel.predictProbabilities(featureVector.values);
     } else {
       // Fallback for other model types
       final prob = await _model!.predict(featureVector.values);
@@ -379,7 +388,9 @@ class FocusEngineFactory {
   /// Uses linear composite algorithm matching Python SDK
   static FocusEngine createDefault({
     FocusConfig? config,
-    void Function(String level, String message, {Map<String, dynamic>? context})? onLog,
+    void Function(String level, String message,
+            {Map<String, dynamic>? context})?
+        onLog,
   }) {
     return FocusEngine(
       config: config,

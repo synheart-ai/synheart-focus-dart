@@ -26,17 +26,21 @@ class ONNXRuntimeModel implements OnDeviceModel {
       // Load scaler info from JSON file (Python SDK format)
       // Try scaler_info_top_6_features.json first, then fallback to meta.json
       String? scalerJsonString;
+      String? scalerPath;
       try {
-        final scalerPath = modelPath.replaceAll('.onnx', '').replaceAll('_model', '');
+        // Calculate potential scaler path for logging
+        scalerPath = modelPath.replaceAll('.onnx', '').replaceAll('_model', '');
+
         // Try different possible paths
         final possiblePaths = [
           modelPath.replaceAll('.onnx', '_scaler_info.json'),
           modelPath.replaceAll('.onnx', '_scaler.json'),
-          modelPath.replaceAll('cnn_lstm_top_6_features.onnx', 'scaler_info_top_6_features.json'),
+          modelPath.replaceAll('cnn_lstm_top_6_features.onnx',
+              'scaler_info_top_6_features.json'),
           'packages/synheart_focus/assets/models/scaler_info_top_6_features.json',
           'assets/models/scaler_info_top_6_features.json',
         ];
-        
+
         for (final path in possiblePaths) {
           try {
             scalerJsonString = await rootBundle.loadString(path);
@@ -45,7 +49,7 @@ class ONNXRuntimeModel implements OnDeviceModel {
             continue;
           }
         }
-        
+
         if (scalerJsonString == null) {
           throw Exception('Scaler info file not found');
         }
@@ -60,7 +64,7 @@ class ONNXRuntimeModel implements OnDeviceModel {
       }
 
       final scalerInfo = json.decode(scalerJsonString) as Map<String, dynamic>;
-      
+
       // Extract scaler statistics (Python SDK format)
       _scalerMean = List<double>.from(
         (scalerInfo['mean_'] as List).map((e) => (e as num).toDouble()),
@@ -69,8 +73,8 @@ class ONNXRuntimeModel implements OnDeviceModel {
         (scalerInfo['scale_'] as List).map((e) => (e as num).toDouble()),
       );
       _featureNames = List<String>.from(
-        scalerInfo['feature_names'] as List? ?? 
-        ['MEDIAN_RR', 'HR', 'MEAN_RR', 'SDRR_RMSSD', 'pNN25', 'higuci'],
+        scalerInfo['feature_names'] as List? ??
+            ['MEDIAN_RR', 'HR', 'MEAN_RR', 'SDRR_RMSSD', 'pNN25', 'higuci'],
       );
 
       // Initialize ONNX Runtime
@@ -87,13 +91,21 @@ class ONNXRuntimeModel implements OnDeviceModel {
         positiveClass: 'Focused',
       );
 
+      // Store metadata for debugging and potential future use
       _metadata = {
         'model_id': _info.id,
         'version': '1.0',
         'type': 'onnx',
         'labels': _info.classNames,
         'feature_names': _featureNames,
+        'scaler_path': scalerPath,
+        'model_path': modelPath,
       };
+
+      // Log metadata for debugging (original developer may need this)
+      print('[ONNXRuntimeModel] Model loaded successfully');
+      print('[ONNXRuntimeModel] Metadata: $_metadata');
+      print('[ONNXRuntimeModel] Scaler path attempted: $scalerPath');
 
       _isLoaded = true;
     } catch (e) {
@@ -119,7 +131,7 @@ class ONNXRuntimeModel implements OnDeviceModel {
     for (int i = 0; i < features.length; i++) {
       final mean = _scalerMean[i];
       final scale = _scalerScale[i];
-      
+
       // Avoid division by zero
       if (scale > 0) {
         normalized.add((features[i] - mean) / scale);
@@ -132,7 +144,8 @@ class ONNXRuntimeModel implements OnDeviceModel {
 
   /// Predict focus state probabilities (returns all class probabilities)
   /// Matching Python SDK ONNXFocusModel.predict() behavior
-  Future<Map<String, double>> predictProbabilities(List<double> features) async {
+  Future<Map<String, double>> predictProbabilities(
+      List<double> features) async {
     if (!_isLoaded) throw Exception('Model not loaded');
 
     try {
@@ -145,7 +158,8 @@ class ONNXRuntimeModel implements OnDeviceModel {
       }
       final inputName = _session.inputNames[0];
       final inputShape = [1, normalizedFeatures.length]; // Batch size 1
-      final inputTensor = await OrtValue.fromList(normalizedFeatures, inputShape);
+      final inputTensor =
+          await OrtValue.fromList(normalizedFeatures, inputShape);
 
       // Run inference
       final inputs = <String, OrtValue>{inputName: inputTensor};
@@ -156,6 +170,8 @@ class ONNXRuntimeModel implements OnDeviceModel {
       }
 
       // Extract logits from output
+      // Note: _extractProbabilities is available as an alternative method
+      // if the model outputs probabilities directly instead of logits
       final logits = await _extractLogits(outputs);
 
       if (logits.isEmpty) {
@@ -167,7 +183,9 @@ class ONNXRuntimeModel implements OnDeviceModel {
 
       // Return as map matching Python SDK format
       final result = <String, double>{};
-      for (int i = 0; i < _info.classNames!.length && i < probabilities.length; i++) {
+      for (int i = 0;
+          i < _info.classNames!.length && i < probabilities.length;
+          i++) {
         result[_info.classNames![i]] = probabilities[i];
       }
 
@@ -180,9 +198,10 @@ class ONNXRuntimeModel implements OnDeviceModel {
   @override
   Future<double> predict(List<double> features) async {
     final probabilities = await predictProbabilities(features);
-    
+
     // Return probability of "Focused" class (positive class)
-    return probabilities['Focused'] ?? probabilities.values.reduce((a, b) => a > b ? a : b);
+    return probabilities['Focused'] ??
+        probabilities.values.reduce((a, b) => a > b ? a : b);
   }
 
   /// Extract logits from ONNX output
@@ -201,20 +220,25 @@ class ONNXRuntimeModel implements OnDeviceModel {
   List<double> _softmax(List<double> logits) {
     // Find maximum for numerical stability
     final maxLogit = logits.reduce((a, b) => a > b ? a : b);
-    
+
     // Calculate exponentials
-    final expValues = logits.map((logit) => 
-      math.exp(logit - maxLogit)
-    ).toList();
-    
+    final expValues =
+        logits.map((logit) => math.exp(logit - maxLogit)).toList();
+
     final sumExp = expValues.fold(0.0, (a, b) => a + b);
-    
+
     if (sumExp == 0.0) {
       // Fallback: uniform distribution
       return List.filled(logits.length, 1.0 / logits.length);
     }
-    
+
     return expValues.map((exp) => exp / sumExp).toList();
+  }
+
+  /// Get model metadata (for debugging and inspection)
+  Map<String, dynamic> get metadata {
+    if (!_isLoaded) throw Exception('Model not loaded');
+    return Map<String, dynamic>.from(_metadata);
   }
 
   @override
@@ -225,13 +249,21 @@ class ONNXRuntimeModel implements OnDeviceModel {
     }
   }
 
+  /// Extract probabilities from ONNX output (alternative to _extractLogits)
+  /// This method can be used if the model outputs probabilities directly
+  /// instead of logits. Kept for potential future use or debugging.
+  ///
+  /// To use this method, modify predictProbabilities() to call this instead of _extractLogits()
+  // ignore: unused_element
   Future<List<double>> _extractProbabilities(
     Map<String, OrtValue> outputs,
   ) async {
+    print('[ONNXRuntimeModel] Using extractProbabilities method');
     for (final entry in outputs.entries) {
       final data = await entry.value.asList();
       final flattened = _flattenToDoubles(data);
       if (flattened != null && flattened.isNotEmpty) {
+        print('[ONNXRuntimeModel] Extracted probabilities: $flattened');
         return flattened;
       }
     }
@@ -253,4 +285,3 @@ class ONNXRuntimeModel implements OnDeviceModel {
     return null;
   }
 }
-

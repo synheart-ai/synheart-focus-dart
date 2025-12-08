@@ -1,32 +1,32 @@
 /// Configuration for Focus Engine
-/// 
+///
 /// Merges configuration from both focus-core-dart and synheart-focus-dart
 class FocusConfig {
   // From focus-core-dart
   /// Exponential smoothing factor for scores (λ=0.9 default)
   final double smoothingLambda;
-  
+
   /// Model identifier to use
   final String modelId;
-  
+
   /// Enable/disable smoothing
   final bool enableSmoothing;
-  
+
   /// Enable/disable artifact detection
   final bool enableArtifactDetection;
-  
+
   /// Motion threshold for artifact detection (g)
   final double motionThreshold;
-  
+
   /// Confidence threshold below which to flag low confidence
   final double lowConfidenceThreshold;
-  
+
   /// Window size in seconds for feature extraction (matching Python SDK default: 60s)
   final int windowSeconds;
-  
+
   /// Stride/step size in seconds for sliding window (matching Python SDK default: 5s)
   final int stepSeconds;
-  
+
   /// Minimum RR intervals required for inference (matching Python SDK default: 30)
   final int minRrCount;
 
@@ -79,14 +79,18 @@ class FocusConfig {
       smoothingLambda: (json['smoothing_lambda'] as num?)?.toDouble() ?? 0.9,
       modelId: json['model_id'] as String? ?? 'focus_model_v1',
       enableSmoothing: json['enable_smoothing'] as bool? ?? true,
-      enableArtifactDetection: json['enable_artifact_detection'] as bool? ?? true,
+      enableArtifactDetection:
+          json['enable_artifact_detection'] as bool? ?? true,
       motionThreshold: (json['motion_threshold'] as num?)?.toDouble() ?? 2.0,
-      lowConfidenceThreshold: (json['low_confidence_threshold'] as num?)?.toDouble() ?? 0.3,
+      lowConfidenceThreshold:
+          (json['low_confidence_threshold'] as num?)?.toDouble() ?? 0.3,
       windowSeconds: (json['window_seconds'] as num?)?.toInt() ?? 60,
       stepSeconds: (json['step_seconds'] as num?)?.toInt() ?? 5,
       minRrCount: (json['min_rr_count'] as num?)?.toInt() ?? 30,
-      highFocusThreshold: (json['highFocusThreshold'] as num?)?.toDouble() ?? 0.7,
-      mediumFocusThreshold: (json['mediumFocusThreshold'] as num?)?.toDouble() ?? 0.4,
+      highFocusThreshold:
+          (json['highFocusThreshold'] as num?)?.toDouble() ?? 0.7,
+      mediumFocusThreshold:
+          (json['mediumFocusThreshold'] as num?)?.toDouble() ?? 0.4,
       hsiWeight: (json['hsiWeight'] as num?)?.toDouble() ?? 0.6,
       behaviorWeight: (json['behaviorWeight'] as num?)?.toDouble() ?? 0.4,
       smoothingFactor: (json['smoothingFactor'] as num?)?.toDouble() ?? 0.3,
@@ -136,9 +140,11 @@ class FocusConfig {
       smoothingLambda: smoothingLambda ?? this.smoothingLambda,
       modelId: modelId ?? this.modelId,
       enableSmoothing: enableSmoothing ?? this.enableSmoothing,
-      enableArtifactDetection: enableArtifactDetection ?? this.enableArtifactDetection,
+      enableArtifactDetection:
+          enableArtifactDetection ?? this.enableArtifactDetection,
       motionThreshold: motionThreshold ?? this.motionThreshold,
-      lowConfidenceThreshold: lowConfidenceThreshold ?? this.lowConfidenceThreshold,
+      lowConfidenceThreshold:
+          lowConfidenceThreshold ?? this.lowConfidenceThreshold,
       windowSeconds: windowSeconds ?? this.windowSeconds,
       stepSeconds: stepSeconds ?? this.stepSeconds,
       minRrCount: minRrCount ?? this.minRrCount,

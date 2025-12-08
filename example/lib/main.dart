@@ -160,7 +160,7 @@ class _FocusDemoPageState extends State<FocusDemoPage> {
 
   Color _getFocusColorLight() {
     final color = _getFocusColor();
-    return color.withOpacity(0.1);
+    return color.withValues(alpha: 0.1);
   }
 
   @override
@@ -425,7 +425,7 @@ class _FocusDemoPageState extends State<FocusDemoPage> {
                   description,
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                   ),
                 ),
               ],

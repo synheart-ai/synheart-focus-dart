@@ -8,7 +8,7 @@ class FeatureVector {
 }
 
 /// Feature extractor for Focus detection
-/// 
+///
 /// Extracts top 6 features used in focus training (matching Python SDK):
 /// 1. MEDIAN_RR - Median RR interval
 /// 2. HR - Heart rate (mean)
@@ -28,17 +28,18 @@ class FeatureExtractor {
   ];
 
   // Constants matching Python SDK FeatureExtractor
-  static const double minValidRrMs = 300.0;  // 300ms = 200 BPM
+  static const double minValidRrMs = 300.0; // 300ms = 200 BPM
   static const double maxValidRrMs = 2000.0; // 2000ms = 30 BPM
-  static const double maxRrJumpMs = 250.0;  // Maximum allowed jump between successive RR intervals
-  static const double minValidHr = 30.0;     // Minimum valid HR in BPM
-  static const double maxValidHr = 300.0;    // Maximum valid HR in BPM
+  static const double maxRrJumpMs =
+      250.0; // Maximum allowed jump between successive RR intervals
+  static const double minValidHr = 30.0; // Minimum valid HR in BPM
+  static const double maxValidHr = 300.0; // Maximum valid HR in BPM
 
   /// Generate features expected by the Focus model
   ///
   /// Returns `null` when insufficient RR data is available to compute the
   /// required HRV features.
-  /// 
+  ///
   /// Matches Python SDK FeatureExtractor.extract_features() logic
   FeatureVector? toFeatures({
     required List<double> rrIntervalsMs,
@@ -56,7 +57,7 @@ class FeatureExtractor {
 
     // Clean RR intervals (matching Python SDK _clean_rr_intervals)
     final cleanedRr = _cleanRrIntervals(rrIntervalsMs);
-    
+
     // Need at least some RR intervals (Python SDK doesn't enforce minimum here,
     // but we'll check in the engine for min_rr_count)
     if (cleanedRr.isEmpty) {
@@ -84,8 +85,12 @@ class FeatureExtractor {
     final higuci = _computeHiguchi(cleanedRr);
 
     // Validate all features
-    if (medianRr.isNaN || hr.isNaN || meanRr.isNaN || 
-        sdrrRmssd.isNaN || pnn25.isNaN || higuci.isNaN) {
+    if (medianRr.isNaN ||
+        hr.isNaN ||
+        meanRr.isNaN ||
+        sdrrRmssd.isNaN ||
+        pnn25.isNaN ||
+        higuci.isNaN) {
       return null;
     }
 
@@ -144,8 +149,9 @@ class FeatureExtractor {
 
     final mean = rrIntervalsMs.reduce((a, b) => a + b) / rrIntervalsMs.length;
     final variance = rrIntervalsMs
-        .map((x) => (x - mean) * (x - mean))
-        .reduce((a, b) => a + b) / (rrIntervalsMs.length - 1); // Sample std (N-1)
+            .map((x) => (x - mean) * (x - mean))
+            .reduce((a, b) => a + b) /
+        (rrIntervalsMs.length - 1); // Sample std (N-1)
 
     return sqrt(variance);
   }
@@ -154,7 +160,7 @@ class FeatureExtractor {
   /// Matching Python SDK np.median()
   double _computeMedian(List<double> values) {
     if (values.isEmpty) return 0.0;
-    
+
     final sorted = List<double>.from(values)..sort();
     final n = sorted.length;
     if (n % 2 == 1) {
@@ -177,21 +183,21 @@ class FeatureExtractor {
   }
 
   /// Compute Higuchi fractal dimension
-  /// 
+  ///
   /// Measures the complexity/fractal dimension of the RR interval series.
   /// Higher values indicate more complex/irregular patterns.
   double _computeHiguchi(List<double> rr, {int maxK = 10}) {
     if (rr.length < maxK) return 0.0;
-    
+
     final n = rr.length;
     final lk = <double>[];
-    
+
     for (int k = 1; k <= maxK; k++) {
       double sum = 0.0;
       for (int m = 1; m <= k; m++) {
         double lmk = 0.0;
         int count = 0;
-        
+
         for (int i = 1; i <= ((n - m) / k).floor(); i++) {
           final idx = m + (i - 1) * k;
           if (idx < n && idx - k >= 0) {
@@ -199,44 +205,42 @@ class FeatureExtractor {
             count++;
           }
         }
-        
+
         if (count > 0) {
           lmk = lmk * (n - 1) / (count * k * k);
           sum += lmk;
         }
       }
-      
+
       if (k > 0) {
         lk.add(sum / k);
       }
     }
-    
+
     if (lk.isEmpty) return 0.0;
-    
+
     // Compute fractal dimension using linear regression on log-log plot
     // HFD = slope of log(L(k)) vs log(1/k)
-    final logK = lk.asMap().entries.map((e) => 
-        log(1.0 / (e.key + 1))).toList();
+    final logK = lk.asMap().entries.map((e) => log(1.0 / (e.key + 1))).toList();
     final logL = lk.map((l) => log(l > 0 ? l : 0.001)).toList();
-    
+
     // Simple linear regression
     final nPoints = logK.length;
     double sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
-    
+
     for (int i = 0; i < nPoints; i++) {
       sumX += logK[i];
       sumY += logL[i];
       sumXY += logK[i] * logL[i];
       sumX2 += logK[i] * logK[i];
     }
-    
+
     final denominator = nPoints * sumX2 - sumX * sumX;
     if (denominator.abs() < 1e-10) return 0.0;
-    
+
     final slope = (nPoints * sumXY - sumX * sumY) / denominator;
-    
+
     // Higuchi fractal dimension
     return slope.abs();
   }
 }
-

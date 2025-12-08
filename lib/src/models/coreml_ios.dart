@@ -17,4 +17,3 @@ class CoreMLIOS implements OnDeviceModel {
   @override
   Future<void> dispose() async {}
 }
-
