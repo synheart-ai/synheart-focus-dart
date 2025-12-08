@@ -7,7 +7,6 @@ import 'on_device_model.dart';
 class ONNXRuntimeModel implements OnDeviceModel {
   late final OrtSession _session;
   late final ModelInfo _info;
-  late final Map<String, dynamic> _metadata;
   late final List<double> _scalerMean;
   late final List<double> _scalerScale;
   late final List<String> _featureNames;
@@ -27,16 +26,16 @@ class ONNXRuntimeModel implements OnDeviceModel {
       // Try scaler_info_top_6_features.json first, then fallback to meta.json
       String? scalerJsonString;
       try {
-        final scalerPath = modelPath.replaceAll('.onnx', '').replaceAll('_model', '');
         // Try different possible paths
         final possiblePaths = [
           modelPath.replaceAll('.onnx', '_scaler_info.json'),
           modelPath.replaceAll('.onnx', '_scaler.json'),
-          modelPath.replaceAll('cnn_lstm_top_6_features.onnx', 'scaler_info_top_6_features.json'),
+          modelPath.replaceAll('cnn_lstm_top_6_features.onnx',
+              'scaler_info_top_6_features.json'),
           'packages/synheart_focus/assets/models/scaler_info_top_6_features.json',
           'assets/models/scaler_info_top_6_features.json',
         ];
-        
+
         for (final path in possiblePaths) {
           try {
             scalerJsonString = await rootBundle.loadString(path);
@@ -45,7 +44,7 @@ class ONNXRuntimeModel implements OnDeviceModel {
             continue;
           }
         }
-        
+
         if (scalerJsonString == null) {
           throw Exception('Scaler info file not found');
         }
@@ -60,7 +59,7 @@ class ONNXRuntimeModel implements OnDeviceModel {
       }
 
       final scalerInfo = json.decode(scalerJsonString) as Map<String, dynamic>;
-      
+
       // Extract scaler statistics (Python SDK format)
       _scalerMean = List<double>.from(
         (scalerInfo['mean_'] as List).map((e) => (e as num).toDouble()),
@@ -69,8 +68,8 @@ class ONNXRuntimeModel implements OnDeviceModel {
         (scalerInfo['scale_'] as List).map((e) => (e as num).toDouble()),
       );
       _featureNames = List<String>.from(
-        scalerInfo['feature_names'] as List? ?? 
-        ['MEDIAN_RR', 'HR', 'MEAN_RR', 'SDRR_RMSSD', 'pNN25', 'higuci'],
+        scalerInfo['feature_names'] as List? ??
+            ['MEDIAN_RR', 'HR', 'MEAN_RR', 'SDRR_RMSSD', 'pNN25', 'higuci'],
       );
 
       // Initialize ONNX Runtime
@@ -86,14 +85,6 @@ class ONNXRuntimeModel implements OnDeviceModel {
         classNames: ['Focused', 'time pressure', 'Distracted'],
         positiveClass: 'Focused',
       );
-
-      _metadata = {
-        'model_id': _info.id,
-        'version': '1.0',
-        'type': 'onnx',
-        'labels': _info.classNames,
-        'feature_names': _featureNames,
-      };
 
       _isLoaded = true;
     } catch (e) {
@@ -119,7 +110,7 @@ class ONNXRuntimeModel implements OnDeviceModel {
     for (int i = 0; i < features.length; i++) {
       final mean = _scalerMean[i];
       final scale = _scalerScale[i];
-      
+
       // Avoid division by zero
       if (scale > 0) {
         normalized.add((features[i] - mean) / scale);
@@ -132,7 +123,8 @@ class ONNXRuntimeModel implements OnDeviceModel {
 
   /// Predict focus state probabilities (returns all class probabilities)
   /// Matching Python SDK ONNXFocusModel.predict() behavior
-  Future<Map<String, double>> predictProbabilities(List<double> features) async {
+  Future<Map<String, double>> predictProbabilities(
+      List<double> features) async {
     if (!_isLoaded) throw Exception('Model not loaded');
 
     try {
@@ -145,7 +137,8 @@ class ONNXRuntimeModel implements OnDeviceModel {
       }
       final inputName = _session.inputNames[0];
       final inputShape = [1, normalizedFeatures.length]; // Batch size 1
-      final inputTensor = await OrtValue.fromList(normalizedFeatures, inputShape);
+      final inputTensor =
+          await OrtValue.fromList(normalizedFeatures, inputShape);
 
       // Run inference
       final inputs = <String, OrtValue>{inputName: inputTensor};
@@ -167,7 +160,9 @@ class ONNXRuntimeModel implements OnDeviceModel {
 
       // Return as map matching Python SDK format
       final result = <String, double>{};
-      for (int i = 0; i < _info.classNames!.length && i < probabilities.length; i++) {
+      for (int i = 0;
+          i < _info.classNames!.length && i < probabilities.length;
+          i++) {
         result[_info.classNames![i]] = probabilities[i];
       }
 
@@ -180,9 +175,10 @@ class ONNXRuntimeModel implements OnDeviceModel {
   @override
   Future<double> predict(List<double> features) async {
     final probabilities = await predictProbabilities(features);
-    
+
     // Return probability of "Focused" class (positive class)
-    return probabilities['Focused'] ?? probabilities.values.reduce((a, b) => a > b ? a : b);
+    return probabilities['Focused'] ??
+        probabilities.values.reduce((a, b) => a > b ? a : b);
   }
 
   /// Extract logits from ONNX output
@@ -201,19 +197,18 @@ class ONNXRuntimeModel implements OnDeviceModel {
   List<double> _softmax(List<double> logits) {
     // Find maximum for numerical stability
     final maxLogit = logits.reduce((a, b) => a > b ? a : b);
-    
+
     // Calculate exponentials
-    final expValues = logits.map((logit) => 
-      math.exp(logit - maxLogit)
-    ).toList();
-    
+    final expValues =
+        logits.map((logit) => math.exp(logit - maxLogit)).toList();
+
     final sumExp = expValues.fold(0.0, (a, b) => a + b);
-    
+
     if (sumExp == 0.0) {
       // Fallback: uniform distribution
       return List.filled(logits.length, 1.0 / logits.length);
     }
-    
+
     return expValues.map((exp) => exp / sumExp).toList();
   }
 
@@ -223,19 +218,6 @@ class ONNXRuntimeModel implements OnDeviceModel {
       // ONNX sessions are automatically disposed when they go out of scope
       _isLoaded = false;
     }
-  }
-
-  Future<List<double>> _extractProbabilities(
-    Map<String, OrtValue> outputs,
-  ) async {
-    for (final entry in outputs.entries) {
-      final data = await entry.value.asList();
-      final flattened = _flattenToDoubles(data);
-      if (flattened != null && flattened.isNotEmpty) {
-        return flattened;
-      }
-    }
-    throw Exception('Could not extract probability tensor from outputs');
   }
 
   List<double>? _flattenToDoubles(dynamic data) {
@@ -253,4 +235,3 @@ class ONNXRuntimeModel implements OnDeviceModel {
     return null;
   }
 }
-

@@ -1,7 +1,7 @@
 import 'dart:math';
 
 /// Adaptive baseline for physiological normalization
-/// 
+///
 /// Implements rolling baseline updates per RFC specification:
 /// - Auto-update every 24 hours
 /// - Maintains population fallback
@@ -9,23 +9,23 @@ import 'dart:math';
 class AdaptiveBaseline {
   /// Update interval for baseline recalculation
   final Duration updateInterval;
-  
+
   /// Minimum samples required for reliable baseline
   final int minSamples;
-  
+
   /// Current baseline values
   double _hrMean;
   double _hrStd;
   double _hrvMean;
   double _hrvStd;
-  
+
   /// Last update timestamp
   DateTime _lastUpdate;
-  
+
   /// Sample storage for baseline calculation
   final List<double> _hrSamples = [];
   final List<double> _hrvSamples = [];
-  
+
   /// Population baseline (fallback)
   static const double _populationHrMean = 72.0;
   static const double _populationHrStd = 12.0;
@@ -39,11 +39,11 @@ class AdaptiveBaseline {
     double? initialHrStd,
     double? initialHrvMean,
     double? initialHrvStd,
-  }) : _hrMean = initialHrMean ?? _populationHrMean,
-       _hrStd = initialHrStd ?? _populationHrStd,
-       _hrvMean = initialHrvMean ?? _populationHrvMean,
-       _hrvStd = initialHrvStd ?? _populationHrvStd,
-       _lastUpdate = DateTime.now().toUtc();
+  })  : _hrMean = initialHrMean ?? _populationHrMean,
+        _hrStd = initialHrStd ?? _populationHrStd,
+        _hrvMean = initialHrvMean ?? _populationHrvMean,
+        _hrvStd = initialHrvStd ?? _populationHrvStd,
+        _lastUpdate = DateTime.now().toUtc();
 
   /// Add new physiological samples
   void addSamples({
@@ -52,7 +52,7 @@ class AdaptiveBaseline {
   }) {
     _hrSamples.add(hrBpm);
     _hrvSamples.add(hrvSdnn);
-    
+
     // Check if we should update baseline
     if (_shouldUpdate()) {
       _updateBaseline();
@@ -89,30 +89,29 @@ class AdaptiveBaseline {
   bool _shouldUpdate() {
     final now = DateTime.now().toUtc();
     final timeSinceUpdate = now.difference(_lastUpdate);
-    
-    return timeSinceUpdate >= updateInterval && 
-           _hrSamples.length >= minSamples;
+
+    return timeSinceUpdate >= updateInterval && _hrSamples.length >= minSamples;
   }
 
   /// Update baseline from stored samples
   void _updateBaseline() {
     if (_hrSamples.length < minSamples) return;
-    
+
     // Calculate new HR baseline
     _hrMean = _mean(_hrSamples);
     _hrStd = _std(_hrSamples, _hrMean);
-    
+
     // Calculate new HRV baseline
     _hrvMean = _mean(_hrvSamples);
     _hrvStd = _std(_hrvSamples, _hrvMean);
-    
+
     // Clear old samples (keep recent ones for smoothing)
     final keepCount = minSamples ~/ 2;
     if (_hrSamples.length > keepCount) {
       _hrSamples.removeRange(0, _hrSamples.length - keepCount);
       _hrvSamples.removeRange(0, _hrvSamples.length - keepCount);
     }
-    
+
     _lastUpdate = DateTime.now().toUtc();
   }
 
@@ -129,7 +128,7 @@ class AdaptiveBaseline {
     _hrStd = _populationHrStd;
     _hrvMean = _populationHrvMean;
     _hrvStd = _populationHrvStd;
-    
+
     _hrSamples.clear();
     _hrvSamples.clear();
     _lastUpdate = DateTime.now().toUtc();
@@ -148,24 +147,24 @@ class AdaptiveBaseline {
   }
 
   /// Check if baseline is personalized (not population)
-  bool get isPersonalized => 
-      _hrSamples.length >= minSamples && 
+  bool get isPersonalized =>
+      _hrSamples.length >= minSamples &&
       (_hrMean - _populationHrMean).abs() > 5.0;
 
   /// Get confidence in current baseline (0-1)
   double get confidence {
     if (_hrSamples.length < minSamples) return 0.0;
-    
+
     final sampleCount = _hrSamples.length.toDouble();
     final maxSamples = minSamples * 2.0;
-    
+
     // Confidence based on sample count and recency
     final countConfidence = (sampleCount / maxSamples).clamp(0.0, 1.0);
-    
+
     final now = DateTime.now().toUtc();
     final hoursSinceUpdate = now.difference(_lastUpdate).inHours;
     final recencyConfidence = (1.0 - hoursSinceUpdate / 48.0).clamp(0.0, 1.0);
-    
+
     return (countConfidence * 0.7 + recencyConfidence * 0.3);
   }
 
@@ -177,11 +176,11 @@ class AdaptiveBaseline {
   /// Compute standard deviation
   double _std(List<double> values, double mean) {
     if (values.length < 2) return 0.0;
-    
-    final variance = values
-        .map((x) => pow(x - mean, 2))
-        .reduce((a, b) => a + b) / (values.length - 1);
-    
+
+    final variance =
+        values.map((x) => pow(x - mean, 2)).reduce((a, b) => a + b) /
+            (values.length - 1);
+
     return sqrt(variance);
   }
 
@@ -218,8 +217,8 @@ class AdaptiveBaseline {
   @override
   String toString() {
     return 'AdaptiveBaseline(hr: ${_hrMean.toStringAsFixed(1)}±${_hrStd.toStringAsFixed(1)}, '
-           'hrv: ${_hrvMean.toStringAsFixed(1)}±${_hrvStd.toStringAsFixed(1)}, '
-           'samples: ${_hrSamples.length}, confidence: ${(confidence * 100).toStringAsFixed(1)}%)';
+        'hrv: ${_hrvMean.toStringAsFixed(1)}±${_hrvStd.toStringAsFixed(1)}, '
+        'samples: ${_hrSamples.length}, confidence: ${(confidence * 100).toStringAsFixed(1)}%)';
   }
 }
 
@@ -262,7 +261,7 @@ class AdaptiveBaselineFactory {
 
     final hrMean = hrHistory.reduce((a, b) => a + b) / hrHistory.length;
     final hrStd = _computeStd(hrHistory, hrMean);
-    
+
     final hrvMean = hrvHistory.reduce((a, b) => a + b) / hrvHistory.length;
     final hrvStd = _computeStd(hrvHistory, hrvMean);
 
@@ -278,12 +277,11 @@ class AdaptiveBaselineFactory {
 
   static double _computeStd(List<double> values, double mean) {
     if (values.length < 2) return 0.0;
-    
-    final variance = values
-        .map((x) => pow(x - mean, 2))
-        .reduce((a, b) => a + b) / (values.length - 1);
-    
+
+    final variance =
+        values.map((x) => pow(x - mean, 2)).reduce((a, b) => a + b) /
+            (values.length - 1);
+
     return sqrt(variance);
   }
 }
-

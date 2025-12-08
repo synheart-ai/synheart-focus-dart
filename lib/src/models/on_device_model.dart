@@ -24,4 +24,3 @@ abstract class OnDeviceModel {
 
   Future<void> dispose() async {}
 }
-
