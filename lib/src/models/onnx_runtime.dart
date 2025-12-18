@@ -7,7 +7,6 @@ import 'on_device_model.dart';
 class ONNXRuntimeModel implements OnDeviceModel {
   late final OrtSession _session;
   late final ModelInfo _info;
-  late final Map<String, dynamic> _metadata;
   late final List<double> _scalerMean;
   late final List<double> _scalerScale;
   late final List<String> _featureNames;
@@ -28,9 +27,6 @@ class ONNXRuntimeModel implements OnDeviceModel {
       String? scalerJsonString;
       String? scalerPath;
       try {
-        // Calculate potential scaler path for logging
-        scalerPath = modelPath.replaceAll('.onnx', '').replaceAll('_model', '');
-
         // Try different possible paths
         final possiblePaths = [
           modelPath.replaceAll('.onnx', '_scaler_info.json'),
@@ -90,22 +86,6 @@ class ONNXRuntimeModel implements OnDeviceModel {
         classNames: ['Focused', 'time pressure', 'Distracted'],
         positiveClass: 'Focused',
       );
-
-      // Store metadata for debugging and potential future use
-      _metadata = {
-        'model_id': _info.id,
-        'version': '1.0',
-        'type': 'onnx',
-        'labels': _info.classNames,
-        'feature_names': _featureNames,
-        'scaler_path': scalerPath,
-        'model_path': modelPath,
-      };
-
-      // Log metadata for debugging (original developer may need this)
-      print('[ONNXRuntimeModel] Model loaded successfully');
-      print('[ONNXRuntimeModel] Metadata: $_metadata');
-      print('[ONNXRuntimeModel] Scaler path attempted: $scalerPath');
 
       _isLoaded = true;
     } catch (e) {
@@ -247,27 +227,6 @@ class ONNXRuntimeModel implements OnDeviceModel {
       // ONNX sessions are automatically disposed when they go out of scope
       _isLoaded = false;
     }
-  }
-
-  /// Extract probabilities from ONNX output (alternative to _extractLogits)
-  /// This method can be used if the model outputs probabilities directly
-  /// instead of logits. Kept for potential future use or debugging.
-  ///
-  /// To use this method, modify predictProbabilities() to call this instead of _extractLogits()
-  // ignore: unused_element
-  Future<List<double>> _extractProbabilities(
-    Map<String, OrtValue> outputs,
-  ) async {
-    print('[ONNXRuntimeModel] Using extractProbabilities method');
-    for (final entry in outputs.entries) {
-      final data = await entry.value.asList();
-      final flattened = _flattenToDoubles(data);
-      if (flattened != null && flattened.isNotEmpty) {
-        print('[ONNXRuntimeModel] Extracted probabilities: $flattened');
-        return flattened;
-      }
-    }
-    throw Exception('Could not extract probability tensor from outputs');
   }
 
   List<double>? _flattenToDoubles(dynamic data) {
