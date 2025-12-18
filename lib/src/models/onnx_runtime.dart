@@ -25,7 +25,6 @@ class ONNXRuntimeModel implements OnDeviceModel {
       // Load scaler info from JSON file (Python SDK format)
       // Try scaler_info_top_6_features.json first, then fallback to meta.json
       String? scalerJsonString;
-      String? scalerPath;
       try {
         // Try different possible paths
         final possiblePaths = [
@@ -218,7 +217,16 @@ class ONNXRuntimeModel implements OnDeviceModel {
   /// Get model metadata (for debugging and inspection)
   Map<String, dynamic> get metadata {
     if (!_isLoaded) throw Exception('Model not loaded');
-    return Map<String, dynamic>.from(_metadata);
+    return {
+      'id': _info.id,
+      'type': _info.type,
+      'inputSchema': _info.inputSchema,
+      'classNames': _info.classNames,
+      'positiveClass': _info.positiveClass,
+      'featureNames': _featureNames,
+      'scalerMean': _scalerMean,
+      'scalerScale': _scalerScale,
+    };
   }
 
   @override
