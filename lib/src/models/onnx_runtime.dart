@@ -149,6 +149,8 @@ class ONNXRuntimeModel implements OnDeviceModel {
       }
 
       // Extract logits from output
+      // Note: _extractProbabilities is available as an alternative method
+      // if the model outputs probabilities directly instead of logits
       final logits = await _extractLogits(outputs);
 
       if (logits.isEmpty) {
@@ -210,6 +212,21 @@ class ONNXRuntimeModel implements OnDeviceModel {
     }
 
     return expValues.map((exp) => exp / sumExp).toList();
+  }
+
+  /// Get model metadata (for debugging and inspection)
+  Map<String, dynamic> get metadata {
+    if (!_isLoaded) throw Exception('Model not loaded');
+    return {
+      'id': _info.id,
+      'type': _info.type,
+      'inputSchema': _info.inputSchema,
+      'classNames': _info.classNames,
+      'positiveClass': _info.positiveClass,
+      'featureNames': _featureNames,
+      'scalerMean': _scalerMean,
+      'scalerScale': _scalerScale,
+    };
   }
 
   @override
