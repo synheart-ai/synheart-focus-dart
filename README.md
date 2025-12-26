@@ -25,7 +25,7 @@ Add `synheart_focus` to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  synheart_focus: ^0.1.0
+  synheart_focus: ^0.0.1
 ```
 
 Then run:
@@ -84,7 +84,7 @@ First, add both to your `pubspec.yaml`:
 ```yaml
 dependencies:
   synheart_wear: ^0.1.0    # For wearable data
-  synheart_focus: ^0.1.0   # For focus inference
+  synheart_focus: ^0.0.1   # For focus inference
 ```
 
 Then integrate in your app:
