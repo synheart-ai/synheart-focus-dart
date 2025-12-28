@@ -254,6 +254,10 @@ Tests cover:
 - Model inference performance
 - Edge case handling
 - Multi-modal fusion
+- Integration with synheart-core FocusHead (25 tests)
+- HSI schema compatibility validation
+- Multimodal data fusion (biosignals + behavior)
+- Temporal smoothing and stable output
 
 ## 📊 Performance
 
@@ -285,6 +289,43 @@ Biosignals (HR, HRV) + Behavior Data
 ```
 
 ## 🔗 Integration
+
+### With synheart-core (HSI)
+
+**synheart_focus** is designed to integrate seamlessly with [synheart-core](https://github.com/synheart-ai/synheart-core) as part of the Human State Interface (HSI) system:
+
+```dart
+import 'package:synheart_core/synheart_core.dart';
+
+// Initialize synheart-core (includes focus capability)
+await Synheart.initialize(
+  userId: 'user_123',
+  config: SynheartConfig(
+    enableWear: true,
+    enableBehavior: true,
+  ),
+);
+
+// Enable focus interpretation layer (powered by synheart-focus)
+await Synheart.enableFocus();
+
+// Get focus updates through HSI
+Synheart.onFocusUpdate.listen((focus) {
+  print('Focus Score: ${focus.focusScore}');
+  print('Focus Label: ${focus.focusLabel}');
+  print('Confidence: ${focus.confidence}');
+  print('Cognitive Load: ${focus.cognitiveLoad}');
+  print('Clarity: ${focus.clarity}');
+});
+```
+
+**HSI Schema Compatibility:**
+- FocusState from synheart-focus maps to HSI FocusState
+- Output validated against HSI_SPECIFICATION.md
+- Comprehensive integration tests ensure compatibility
+- Supports multimodal fusion with HSI (biosignals) + Behavior data
+
+See the [synheart-core documentation](https://github.com/synheart-ai/synheart-core) for more details on HSI integration.
 
 ### With synheart-wear
 
