@@ -36,15 +36,25 @@ flutter pub get
 
 ## 🎯 Quick Start
 
-### Basic Usage
+### Basic Usage with HR Data
 
 ```dart
 import 'package:synheart_focus/synheart_focus.dart';
 
 void main() async {
   // Initialize the focus engine
-  final engine = await FocusEngine.initialize(
-    config: FocusConfig(),
+  final engine = FocusEngine(
+    config: const FocusConfig(
+      windowSeconds: 60,  // 60-second window
+      stepSeconds: 5,     // 5-second step
+      minRrCount: 30,
+    ),
+  );
+
+  // Initialize with ONNX model
+  await engine.initialize(
+    modelPath: 'assets/models/Gradient_Boosting.onnx',
+    backend: 'onnx',
   );
 
   // Subscribe to focus updates
@@ -52,38 +62,26 @@ void main() async {
     print('Focus Score: ${result.focusScore}');
     print('Focus State: ${result.focusState}');
     print('Confidence: ${result.confidence}');
+    print('Probabilities: ${result.probabilities}');
   });
 
-  // Provide biosignal data
-  final hsiData = HSIData(
-    hr: 72.0,
-    hrvRmssd: 45.0,
-    stressIndex: 0.3,
-    motionIntensity: 0.1,
+  // Provide HR data (BPM) - inference happens automatically when window is ready
+  await engine.inferFromHrData(
+    hrBpm: 72.0,
+    timestamp: DateTime.now(),
   );
-
-  // Provide behavioral data
-  final behaviorData = BehaviorData(
-    taskSwitchRate: 0.2,
-    interactionBurstiness: 0.15,
-    idleRatio: 0.1,
-  );
-
-  // Run inference
-  final result = await engine.infer(hsiData, behaviorData);
-  print('Focus Score: ${result.focusScore}');
 }
 ```
 
 ### Integration with synheart-wear
 
-**synheart_focus** works independently but integrates seamlessly with [synheart-wear](https://github.com/synheart-ai/synheart-wear) for real wearable data.
+**synheart_focus** integrates seamlessly with [synheart-wear](https://pub.dev/packages/synheart_wear) for real-time HR data streaming from wearable devices.
 
 First, add both to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  synheart_wear: ^0.1.0    # For wearable data
+  synheart_wear: ^0.2.2    # For wearable data
   synheart_focus: ^0.0.1   # For focus inference
 ```
 
@@ -93,49 +91,74 @@ Then integrate in your app:
 import 'package:synheart_wear/synheart_wear.dart';
 import 'package:synheart_focus/synheart_focus.dart';
 
-// Initialize both SDKs
-final wear = SynheartWear();
-final focusEngine = await FocusEngine.initialize(
-  config: FocusConfig(),
-);
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
 
-await wear.initialize();
-
-// Stream wearable data to focus engine
-wear.streamHR(interval: Duration(seconds: 1)).listen((metrics) {
-  final hsiData = HSIData(
-    hr: metrics.getMetric(MetricType.hr),
-    hrvRmssd: calculateRMSSD(metrics.getMetric(MetricType.rrIntervals)),
-    stressIndex: calculateStress(metrics),
-    motionIntensity: metrics.getMetric(MetricType.motion),
+  // Initialize SynheartWear SDK
+  final adapters = <DeviceAdapter>{
+    DeviceAdapter.appleHealthKit, // Uses Health Connect on Android
+  };
+  final synheartWear = SynheartWear(
+    config: SynheartWearConfig.withAdapters(adapters),
   );
 
-  // Add behavioral data from your app
-  final behaviorData = BehaviorData(
-    taskSwitchRate: appMetrics.taskSwitchRate,
-    interactionBurstiness: appMetrics.interactionBurstiness,
-    idleRatio: appMetrics.idleRatio,
+  // Request permissions
+  await synheartWear.requestPermissions(
+    permissions: {PermissionType.heartRate},
+    reason: 'This app needs access to your heart rate data.',
+  );
+  await synheartWear.initialize();
+
+  // Initialize Focus Engine
+  final focusEngine = FocusEngine(
+    config: const FocusConfig(
+      windowSeconds: 60,
+      stepSeconds: 5,
+      minRrCount: 30,
+    ),
+  );
+  await focusEngine.initialize(
+    modelPath: 'assets/models/Gradient_Boosting.onnx',
+    backend: 'onnx',
   );
 
-  // Get focus state
-  focusEngine.infer(hsiData, behaviorData).then((result) {
-    updateUI(result);
+  // Stream HR data from wearable and feed to focus engine
+  synheartWear.streamHR(interval: const Duration(seconds: 1)).listen((metrics) {
+    final hr = metrics.getMetric(MetricType.hr);
+    if (hr != null) {
+      // Feed HR data to focus engine
+      // Inference happens automatically when 60-second window is ready
+      focusEngine.inferFromHrData(
+        hrBpm: hr.toDouble(),
+        timestamp: DateTime.now(),
+      ).then((result) {
+        if (result != null) {
+          print('Focus State: ${result.focusState}');
+          print('Focus Score: ${result.focusScore}');
+          print('Confidence: ${result.confidence}');
+        }
+      });
+    }
   });
-});
+}
 ```
 
 ## 📊 Supported Focus States
 
-The library currently supports three focus state categories:
+The library supports four cognitive state categories (4-class Gradient Boosting model):
 
-- **🎯 Focused**: High concentration, productive state
-- **⏱️ Time Pressure**: Moderate focus with elevated stress
-- **😵 Distracted**: Low concentration, fragmented attention
+- **🎯 Focused**: Optimal cognitive state, high attention and productivity
+- **😴 Bored**: Low engagement, reduced attention
+- **😰 Anxious**: Heightened arousal, reduced efficiency
+- **🔥 Overload**: Cognitive overload, information processing difficulty
 
 **Focus Scores:**
 - **70-100**: Focused (optimal concentration)
-- **40-70**: Time Pressure (stressed but engaged)
-- **0-40**: Distracted (low concentration)
+- **30-50**: Bored (low engagement)
+- **20-40**: Anxious (heightened arousal)
+- **0-20**: Overload (cognitive overload)
+
+**Note**: The model uses a 60-second sliding window with 5-second steps. First inference occurs after 60 seconds of data collection, then every 5 seconds thereafter.
 
 ## 🔧 API Reference
 
@@ -145,16 +168,36 @@ The main class for focus inference:
 
 ```dart
 class FocusEngine {
-  // Initialize engine with config
-  static Future<FocusEngine> initialize({
-    required FocusConfig config,
+  // Create engine with config
+  FocusEngine({FocusConfig? config, void Function(String, String)? onLog});
+
+  // Initialize with model
+  Future<void> initialize({
+    String? modelPath,
+    String backend = 'onnx',
   });
 
   // Stream of focus updates
-  Stream<FocusResult> get onUpdate;
+  Stream<FocusState> get onUpdate;
 
-  // Run inference on current data
-  Future<FocusResult> infer(HSIData hsiData, BehaviorData behaviorData);
+  // Run inference from HR data (BPM) - recommended approach
+  Future<FocusResult?> inferFromHrData({
+    required double hrBpm,
+    required DateTime timestamp,
+  });
+
+  // Run inference from RR intervals (legacy)
+  Future<FocusResult?> inferFromRrIntervals({
+    required List<double> rrIntervalsMs,
+    required double hrMean,
+    double? motionMagnitude,
+  });
+
+  // Legacy: Run inference with HSI and behavior data
+  Future<FocusState> infer(HSIData hsiData, BehaviorData behaviorData);
+
+  // Reset engine state
+  void reset();
 
   // Dispose resources
   Future<void> dispose();
@@ -167,10 +210,12 @@ Configuration for the focus engine:
 
 ```dart
 class FocusConfig {
-  final Duration window;                // Rolling window size
-  final Duration step;                  // Emission cadence
-  final bool enableAdaptiveBaseline;    // Adaptive personalization
-  final double smoothingFactor;         // Result smoothing (0.0-1.0)
+  final int windowSeconds;              // Window size in seconds (default: 60)
+  final int stepSeconds;                // Step size in seconds (default: 5)
+  final int minRrCount;                 // Minimum RR intervals required (default: 30)
+  final bool enableSmoothing;           // Enable score smoothing (default: true)
+  final double smoothingLambda;         // Smoothing factor (default: 0.9)
+  final bool enableDebugLogging;        // Enable debug logs (default: false)
 }
 ```
 
@@ -181,14 +226,19 @@ Result of focus inference:
 ```dart
 class FocusResult {
   final DateTime timestamp;                // When inference was performed
-  final String focusState;                 // "Focused", "time pressure", or "Distracted"
+  final String focusState;                 // "Focused", "Bored", "Anxious", or "Overload"
   final double focusScore;                 // 0-100 focus score
-  final double confidence;                 // Confidence score (0.0-1.0)
-  final Map<String, double> probabilities; // All state probabilities
-  final Map<String, double> features;      // Extracted features
+  final double confidence;                 // Confidence score (0.0-1.0) - top probability
+  final Map<String, double> probabilities; // All 4 class probabilities
+  final Map<String, double> features;     // All 24 HRV features with values
   final Map<String, dynamic> model;        // Model metadata
 }
 ```
+
+**Features Extracted (24 total):**
+- **Time Domain (9)**: mean_rr, std_rr, min_rr, max_rr, range_rr, rmssd, sdnn, nn50, pnn50
+- **Frequency Domain (11)**: VLF, LF, HF, UHF powers, total_power, lf_hf_ratio, normalized powers
+- **Statistical (4)**: skewness, kurtosis, median_rr, iqr
 
 ### HSIData
 
@@ -271,22 +321,55 @@ Tests cover:
 ## 🏗️ Architecture
 
 ```
-Biosignals (HR, HRV) + Behavior Data
+HR Data (BPM) from Wearable Device
          │
          ▼
 ┌─────────────────────┐
-│   FocusEngine       │
-│  [Feature Extract]  │
-│  [Adaptive Baseline]│
-│  [Model Inference]  │
+│  Windowing Buffer   │
+│  (60-second window) │
+└─────────────────────┘
+         │
+         ▼
+┌─────────────────────┐
+│   HR → IBI Convert  │
+│   (60000 / HR)      │
+└─────────────────────┘
+         │
+         ▼
+┌─────────────────────┐
+│ Z-Score Normalize   │
+│ (Subject-specific)  │
+└─────────────────────┘
+         │
+         ▼
+┌─────────────────────┐
+│ 24 HRV Features      │
+│ (Time, Freq, Stats) │
+└─────────────────────┘
+         │
+         ▼
+┌─────────────────────┐
+│  ONNX Model         │
+│  (Gradient Boosting) │
 └─────────────────────┘
          │
          ▼
    FocusResult
+   (4-class output)
          │
          ▼
     Your App
 ```
+
+**Processing Pipeline:**
+1. Stream HR data (1 Hz) from wearable device
+2. Buffer in 60-second sliding window
+3. Convert HR (BPM) → IBI (ms)
+4. Apply subject-specific z-score normalization
+5. Extract 24 HRV features (time, frequency, statistical domains)
+6. Run ONNX model inference (Gradient Boosting)
+7. Calculate focus score from 4-class probabilities
+8. Return result with all features and probabilities
 
 ## 🔗 Integration
 
