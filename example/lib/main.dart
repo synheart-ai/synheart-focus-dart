@@ -284,9 +284,9 @@ class _FocusTestPageState extends State<FocusTestPage> {
 
   Future<void> _initializeEngine() async {
     try {
-      print('═══════════════════════════════════════════════════════');
-      print('Initializing Focus Engine with Gradient Boosting model...');
-      print('═══════════════════════════════════════════════════════\n');
+      debugPrint('═══════════════════════════════════════════════════════');
+      debugPrint('Initializing Focus Engine with Gradient Boosting model...');
+      debugPrint('═══════════════════════════════════════════════════════\n');
 
       setState(() {
         _status = 'Initializing...';
@@ -300,25 +300,25 @@ class _FocusTestPageState extends State<FocusTestPage> {
           enableDebugLogging: true,
         ),
         onLog: (level, message, {context}) {
-          print('[$level] $message');
+          debugPrint('[$level] $message');
         },
       );
 
-      print('Loading model: assets/models/Gradient_Boosting.onnx...');
+      debugPrint('Loading model: assets/models/Gradient_Boosting.onnx...');
       await _engine!.initialize(
         modelPath: 'assets/models/Gradient_Boosting.onnx',
         backend: 'onnx',
       );
 
-      print('✓ Model loaded successfully!');
-      print('Window: 60 seconds, Step: 5 seconds\n');
+      debugPrint('✓ Model loaded successfully!');
+      debugPrint('Window: 60 seconds, Step: 5 seconds\n');
       setState(() {
         _isInitialized = true;
         _status = 'Ready';
       });
     } catch (e, stackTrace) {
-      print('✗ Error initializing engine: $e');
-      print('Stack trace: $stackTrace');
+      debugPrint('✗ Error initializing engine: $e');
+      debugPrint('Stack trace: $stackTrace');
       setState(() {
         _status = 'Error: $e';
       });
@@ -375,7 +375,7 @@ class _FocusTestPageState extends State<FocusTestPage> {
     if (!_isInitialized || _engine == null || _isRunning) return;
 
     if (_synheartWear == null) {
-      print('⚠️ Wearable service not initialized');
+      debugPrint('⚠️ Wearable service not initialized');
       setState(() {
         _status = 'Wearable service not available';
       });
@@ -391,10 +391,10 @@ class _FocusTestPageState extends State<FocusTestPage> {
       _totalElapsedSeconds = 0;
     });
 
-    print('\n═══════════════════════════════════════════════════════');
-    print('Starting Real-Time HR Data Streaming from Wearable');
-    print('Window: 60 seconds | Step: 5 seconds');
-    print('═══════════════════════════════════════════════════════\n');
+    debugPrint('\n═══════════════════════════════════════════════════════');
+    debugPrint('Starting Real-Time HR Data Streaming from Wearable');
+    debugPrint('Window: 60 seconds | Step: 5 seconds');
+    debugPrint('═══════════════════════════════════════════════════════\n');
 
     // Timer to update elapsed time every second
     Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -445,35 +445,35 @@ class _FocusTestPageState extends State<FocusTestPage> {
 
             // Log to console
             final elapsed = currentTime.difference(_startTime!).inSeconds;
-            print('[$elapsed s] ✓ Inference completed!');
-            print('  HR: ${hrValue.toStringAsFixed(0)} BPM');
-            print('  State: ${result.focusState}');
-            print('  Score: ${result.focusScore.toStringAsFixed(1)}');
-            print(
+            debugPrint('[$elapsed s] ✓ Inference completed!');
+            debugPrint('  HR: ${hrValue.toStringAsFixed(0)} BPM');
+            debugPrint('  State: ${result.focusState}');
+            debugPrint('  Score: ${result.focusScore.toStringAsFixed(1)}');
+            debugPrint(
               '  Confidence: ${(result.confidence * 100).toStringAsFixed(1)}%',
             );
-            print('  Probabilities: ${result.probabilities}');
+            debugPrint('  Probabilities: ${result.probabilities}');
           } else {
             // Log data collection status periodically
             final elapsed = currentTime.difference(_startTime!).inSeconds;
             if (elapsed <= 60 && elapsed % 15 == 0) {
               // Log every 15 seconds during first 60 seconds
-              print(
-                '[$elapsed s] Collecting data... (${elapsed}/60 seconds) | HR: ${hrValue.toStringAsFixed(0)} BPM',
+              debugPrint(
+                '[$elapsed s] Collecting data... ($elapsed/60 seconds) | HR: ${hrValue.toStringAsFixed(0)} BPM',
               );
             } else if (elapsed > 60 && elapsed % 5 == 0) {
               // Log every 5 seconds after 60 seconds if no inference
-              print(
+              debugPrint(
                 '[$elapsed s] Waiting for inference... | HR: ${hrValue.toStringAsFixed(0)} BPM',
               );
             }
           }
         }).catchError((e) {
-          print('Error processing HR data: $e');
+          debugPrint('Error processing HR data: $e');
         });
       },
       onError: (error) {
-        print('Error streaming HR: $error');
+        debugPrint('Error streaming HR: $error');
         setState(() {
           _wearableConnected = false;
           _deviceInfo = 'Stream error: $error';
@@ -483,7 +483,7 @@ class _FocusTestPageState extends State<FocusTestPage> {
   }
 
   void _stopSimulation() {
-    print('\n⚠ Simulation stopped by user\n');
+    debugPrint('\n⚠ Simulation stopped by user\n');
     _hrStreamSubscription?.cancel();
     setState(() {
       _isRunning = false;
@@ -642,7 +642,7 @@ class _FocusTestPageState extends State<FocusTestPage> {
                       LinearProgressIndicator(
                         value: _totalElapsedSeconds / 60.0,
                         backgroundColor: Colors.grey.shade300,
-                        valueColor: AlwaysStoppedAnimation<Color>(
+                        valueColor: const AlwaysStoppedAnimation<Color>(
                           Colors.orange,
                         ),
                         minHeight: 6,
@@ -781,7 +781,7 @@ class _FocusTestPageState extends State<FocusTestPage> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  '${_currentResult!.focusScore.toStringAsFixed(1)}',
+                                  _currentResult!.focusScore.toStringAsFixed(1),
                                   style: TextStyle(
                                     fontSize: 36,
                                     fontWeight: FontWeight.bold,
@@ -906,7 +906,7 @@ class _FocusTestPageState extends State<FocusTestPage> {
                           ],
                         ),
                       );
-                    }).toList(),
+                    }),
 
                     const SizedBox(height: 24),
 

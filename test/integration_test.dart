@@ -44,7 +44,7 @@ void main() {
 
     test('infer accepts multimodal HSI and behavior data', () async {
       // synheart-core FocusHead provides HSI data from biosignals
-      final hsiData = const HSIData(
+      const hsiData = HSIData(
         hr: 72.0,
         hrvRmssd: 45.0,
         stressIndex: 0.3,
@@ -52,7 +52,7 @@ void main() {
       );
 
       // and behavioral data from Behavior Module
-      final behaviorData = const BehaviorData(
+      const behaviorData = BehaviorData(
         taskSwitchRate: 0.2,
         interactionBurstiness: 0.15,
         idleRatio: 0.1,
@@ -69,14 +69,14 @@ void main() {
     });
 
     test('FocusState output is compatible with HSI schema', () async {
-      final hsiData = const HSIData(
+      const hsiData = HSIData(
         hr: 75.0,
         hrvRmssd: 50.0,
         stressIndex: 0.2,
         motionIntensity: 0.15,
       );
 
-      final behaviorData = const BehaviorData(
+      const behaviorData = BehaviorData(
         taskSwitchRate: 0.15,
         interactionBurstiness: 0.25,
         idleRatio: 0.08,
@@ -102,14 +102,14 @@ void main() {
     });
 
     test('HSI FocusState mapping calculations are correct', () async {
-      final hsiData = const HSIData(
+      const hsiData = HSIData(
         hr: 70.0,
         hrvRmssd: 55.0,
         stressIndex: 0.25,
         motionIntensity: 0.1,
       );
 
-      final behaviorData = const BehaviorData(
+      const behaviorData = BehaviorData(
         taskSwitchRate: 0.1,
         interactionBurstiness: 0.3,
         idleRatio: 0.05,
@@ -185,14 +185,14 @@ void main() {
 
     test('applies temporal smoothing for stable output', () async {
       // First inference establishes baseline
-      final hsiData1 = const HSIData(
+      const hsiData1 = HSIData(
         hr: 70.0,
         hrvRmssd: 50.0,
         stressIndex: 0.2,
         motionIntensity: 0.1,
       );
 
-      final behaviorData1 = const BehaviorData(
+      const behaviorData1 = BehaviorData(
         taskSwitchRate: 0.1,
         interactionBurstiness: 0.2,
         idleRatio: 0.05,
@@ -201,14 +201,14 @@ void main() {
       final result1 = await engine.infer(hsiData1, behaviorData1);
 
       // Second inference with very different inputs
-      final hsiData2 = const HSIData(
+      const hsiData2 = HSIData(
         hr: 100.0,
         hrvRmssd: 25.0,
         stressIndex: 0.8,
         motionIntensity: 0.6,
       );
 
-      final behaviorData2 = const BehaviorData(
+      const behaviorData2 = BehaviorData(
         taskSwitchRate: 1.5,
         interactionBurstiness: 0.8,
         idleRatio: 0.5,
@@ -227,14 +227,14 @@ void main() {
 
     test('handles edge case inputs gracefully', () async {
       // Test with extreme HR
-      final hsiDataHighHR = const HSIData(
+      const hsiDataHighHR = HSIData(
         hr: 180.0,
         hrvRmssd: 15.0,
         stressIndex: 0.95,
         motionIntensity: 0.9,
       );
 
-      final behaviorData = const BehaviorData(
+      const behaviorData = BehaviorData(
         taskSwitchRate: 0.2,
         interactionBurstiness: 0.3,
         idleRatio: 0.1,
@@ -244,7 +244,7 @@ void main() {
       expect(result1.focusScore, inInclusiveRange(0.0, 1.0));
 
       // Test with low HR
-      final hsiDataLowHR = const HSIData(
+      const hsiDataLowHR = HSIData(
         hr: 45.0,
         hrvRmssd: 80.0,
         stressIndex: 0.1,
@@ -255,14 +255,14 @@ void main() {
       expect(result2.focusScore, inInclusiveRange(0.0, 1.0));
 
       // Test with extreme task switching
-      final hsiData = const HSIData(
+      const hsiData = HSIData(
         hr: 75.0,
         hrvRmssd: 40.0,
         stressIndex: 0.3,
         motionIntensity: 0.2,
       );
 
-      final behaviorDataHighSwitch = const BehaviorData(
+      const behaviorDataHighSwitch = BehaviorData(
         taskSwitchRate: 5.0, // Very high switching
         interactionBurstiness: 0.95,
         idleRatio: 0.8,
@@ -278,14 +278,14 @@ void main() {
 
     test('reset clears engine state', () async {
       // Establish some state
-      final hsiData = const HSIData(
+      const hsiData = HSIData(
         hr: 72.0,
         hrvRmssd: 45.0,
         stressIndex: 0.3,
         motionIntensity: 0.1,
       );
 
-      final behaviorData = const BehaviorData(
+      const behaviorData = BehaviorData(
         taskSwitchRate: 0.2,
         interactionBurstiness: 0.15,
         idleRatio: 0.1,
@@ -308,14 +308,14 @@ void main() {
 
     test('confidence decreases with extreme/invalid values', () async {
       // Normal values should have higher confidence
-      final hsiDataNormal = const HSIData(
+      const hsiDataNormal = HSIData(
         hr: 72.0,
         hrvRmssd: 45.0,
         stressIndex: 0.3,
         motionIntensity: 0.1,
       );
 
-      final behaviorData = const BehaviorData(
+      const behaviorData = BehaviorData(
         taskSwitchRate: 0.2,
         interactionBurstiness: 0.15,
         idleRatio: 0.1,
@@ -324,7 +324,7 @@ void main() {
       final resultNormal = await engine.infer(hsiDataNormal, behaviorData);
 
       // Extreme values should have lower confidence
-      final hsiDataExtreme = const HSIData(
+      const hsiDataExtreme = HSIData(
         hr: 185.0,
         hrvRmssd: 5.0,
         stressIndex: 0.98,
@@ -343,14 +343,14 @@ void main() {
 
     test('focus labels are assigned correctly', () async {
       // High focus scenario
-      final hsiDataHighFocus = const HSIData(
+      const hsiDataHighFocus = HSIData(
         hr: 70.0,
         hrvRmssd: 55.0,
         stressIndex: 0.15,
         motionIntensity: 0.05,
       );
 
-      final behaviorDataHighFocus = const BehaviorData(
+      const behaviorDataHighFocus = BehaviorData(
         taskSwitchRate: 0.08,
         interactionBurstiness: 0.28,
         idleRatio: 0.03,
@@ -363,14 +363,14 @@ void main() {
       expect(resultHigh.focusLabel, anyOf('High Focus', 'Medium Focus'));
 
       // Low focus scenario
-      final hsiDataLowFocus = const HSIData(
+      const hsiDataLowFocus = HSIData(
         hr: 110.0,
         hrvRmssd: 20.0,
         stressIndex: 0.85,
         motionIntensity: 0.75,
       );
 
-      final behaviorDataLowFocus = const BehaviorData(
+      const behaviorDataLowFocus = BehaviorData(
         taskSwitchRate: 2.5,
         interactionBurstiness: 0.9,
         idleRatio: 0.7,
@@ -385,14 +385,14 @@ void main() {
     });
 
     test('metadata contains useful diagnostic information', () async {
-      final hsiData = const HSIData(
+      const hsiData = HSIData(
         hr: 72.0,
         hrvRmssd: 45.0,
         stressIndex: 0.3,
         motionIntensity: 0.1,
       );
 
-      final behaviorData = const BehaviorData(
+      const behaviorData = BehaviorData(
         taskSwitchRate: 0.2,
         interactionBurstiness: 0.15,
         idleRatio: 0.1,
@@ -480,14 +480,14 @@ void main() {
         ),
       );
 
-      final hsiData = const HSIData(
+      const hsiData = HSIData(
         hr: 72.0,
         hrvRmssd: 45.0,
         stressIndex: 0.3,
         motionIntensity: 0.1,
       );
 
-      final behaviorData = const BehaviorData(
+      const behaviorData = BehaviorData(
         taskSwitchRate: 0.2,
         interactionBurstiness: 0.15,
         idleRatio: 0.1,
@@ -516,14 +516,14 @@ void main() {
         config: const FocusConfig(hsiWeight: 0.1, behaviorWeight: 0.9),
       );
 
-      final hsiData = const HSIData(
+      const hsiData = HSIData(
         hr: 70.0,
         hrvRmssd: 55.0,
         stressIndex: 0.15,
         motionIntensity: 0.05,
       );
 
-      final behaviorData = const BehaviorData(
+      const behaviorData = BehaviorData(
         taskSwitchRate: 0.08,
         interactionBurstiness: 0.28,
         idleRatio: 0.03,

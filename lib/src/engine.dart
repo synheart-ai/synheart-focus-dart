@@ -321,9 +321,7 @@ class FocusEngine {
     }
 
     // Track first data point
-    if (_firstDataTime == null) {
-      _firstDataTime = timestamp;
-    }
+    _firstDataTime ??= timestamp;
 
     // Add HR to buffer with timestamp
     _hrBuffer.add(_TimestampedValue(timestamp, hrBpm));

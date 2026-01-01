@@ -20,14 +20,14 @@ void main() {
     });
 
     test('performs basic inference', () async {
-      final hsiData = HSIData(
+      const hsiData = HSIData(
         hr: 72,
         hrvRmssd: 45,
         stressIndex: 0.3,
         motionIntensity: 0.1,
       );
 
-      final behaviorData = BehaviorData(
+      const behaviorData = BehaviorData(
         taskSwitchRate: 0.2,
         interactionBurstiness: 0.15,
         idleRatio: 0.1,
@@ -43,14 +43,14 @@ void main() {
     });
 
     test('emits updates on stream', () async {
-      final hsiData = HSIData(
+      const hsiData = HSIData(
         hr: 72,
         hrvRmssd: 45,
         stressIndex: 0.3,
         motionIntensity: 0.1,
       );
 
-      final behaviorData = BehaviorData(
+      const behaviorData = BehaviorData(
         taskSwitchRate: 0.2,
         interactionBurstiness: 0.15,
         idleRatio: 0.1,
@@ -64,21 +64,21 @@ void main() {
     });
 
     test('applies smoothing over multiple inferences', () async {
-      final hsiData1 = HSIData(
+      const hsiData1 = HSIData(
         hr: 72,
         hrvRmssd: 45,
         stressIndex: 0.3,
         motionIntensity: 0.1,
       );
 
-      final hsiData2 = HSIData(
+      const hsiData2 = HSIData(
         hr: 100,
         hrvRmssd: 30,
         stressIndex: 0.7,
         motionIntensity: 0.5,
       );
 
-      final behaviorData = BehaviorData(
+      const behaviorData = BehaviorData(
         taskSwitchRate: 0.2,
         interactionBurstiness: 0.15,
         idleRatio: 0.1,
@@ -94,14 +94,14 @@ void main() {
     });
 
     test('returns high focus for optimal inputs', () async {
-      final hsiData = HSIData(
+      const hsiData = HSIData(
         hr: 70,
         hrvRmssd: 50,
         stressIndex: 0.1,
         motionIntensity: 0.05,
       );
 
-      final behaviorData = BehaviorData(
+      const behaviorData = BehaviorData(
         taskSwitchRate: 0.1,
         interactionBurstiness: 0.3,
         idleRatio: 0.05,
@@ -114,14 +114,14 @@ void main() {
     });
 
     test('returns low focus for poor inputs', () async {
-      final hsiData = HSIData(
+      const hsiData = HSIData(
         hr: 120,
         hrvRmssd: 15,
         stressIndex: 0.9,
         motionIntensity: 0.8,
       );
 
-      final behaviorData = BehaviorData(
+      const behaviorData = BehaviorData(
         taskSwitchRate: 2.0,
         interactionBurstiness: 0.9,
         idleRatio: 0.8,
@@ -154,7 +154,7 @@ void main() {
 
   group('Data Models', () {
     test('HSIData toJson works correctly', () {
-      final data = HSIData(
+      const data = HSIData(
         hr: 72,
         hrvRmssd: 45,
         stressIndex: 0.3,
@@ -170,7 +170,7 @@ void main() {
     });
 
     test('BehaviorData toJson works correctly', () {
-      final data = BehaviorData(
+      const data = BehaviorData(
         taskSwitchRate: 0.2,
         interactionBurstiness: 0.15,
         idleRatio: 0.1,
