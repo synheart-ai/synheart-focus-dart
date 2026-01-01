@@ -2,32 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
 
 ## [0.1.0] - 2026-01-01
 
 ### Added
-- Comprehensive integration tests matching synheart-core FocusHead usage pattern (15 tests)
-  - Tests for FocusEngine initialization with synheart-core config
-  - Tests for infer(HSIData, BehaviorData) API pattern with multimodal fusion
-  - Tests for streaming updates via onUpdate for reactive integration
-  - Tests for temporal smoothing and stable output
-  - Tests for edge case handling (extreme HR, high task switching, low HR)
-  - Tests for engine state reset and lifecycle management
-  - Tests for confidence calculation with varying data quality
-  - Tests for focus label assignment (High/Medium/Low Focus)
-  - Tests for metadata diagnostic information
-  - Tests for custom configuration (thresholds, weights)
+- Comprehensive integration tests matching synheart-core FocusHead usage pattern 
 
-- HSI schema compatibility tests (2 tests)
-  - Tests verifying FocusState output matches HSI schema
-  - Tests for toJson output HSI compatibility
-  - Tests validating derived fields (cognitiveLoad, clarity, distraction) calculations
-  - Tests ensuring focus scores are valid (0.0-1.0 range)
-  - Tests for inverse relationship between focus and distraction
+- HSI schema compatibility tests 
 
 ### Improved
-- Test coverage increased from 10 to 25 tests (150% increase)
+- Test coverage increased
 - Validated compatibility with synheart-core-dart v0.0.1 FocusHead implementation
 - Confirmed multimodal fusion with HSI (biosignals) + Behavior data
 - Verified temporal smoothing maintains stable output
