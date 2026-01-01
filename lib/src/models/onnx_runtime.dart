@@ -23,77 +23,110 @@ class ONNXRuntimeModel implements OnDeviceModel {
 
   Future<void> _loadModel(String modelPath) async {
     try {
-      // Load scaler info from JSON file (Python SDK format)
-      // Try scaler_info_top_6_features.json first, then fallback to meta.json
-      String? scalerJsonString;
+      // Load metadata from JSON file
+      // Try Gradient_Boosting_metadata.json first, then fallback to other formats
+      String? metadataJsonString;
       try {
-        final scalerPath = modelPath.replaceAll('.onnx', '').replaceAll('_model', '');
-        // Try different possible paths
         final possiblePaths = [
-          modelPath.replaceAll('.onnx', '_scaler_info.json'),
-          modelPath.replaceAll('.onnx', '_scaler.json'),
+          modelPath.replaceAll('.onnx', '_metadata.json'),
+          modelPath.replaceAll('Gradient_Boosting.onnx', 'Gradient_Boosting_metadata.json'),
           modelPath.replaceAll('cnn_lstm_top_6_features.onnx', 'scaler_info_top_6_features.json'),
+          'packages/synheart_focus/assets/models/Gradient_Boosting_metadata.json',
+          'assets/models/Gradient_Boosting_metadata.json',
           'packages/synheart_focus/assets/models/scaler_info_top_6_features.json',
           'assets/models/scaler_info_top_6_features.json',
         ];
         
         for (final path in possiblePaths) {
           try {
-            scalerJsonString = await rootBundle.loadString(path);
+            metadataJsonString = await rootBundle.loadString(path);
             break;
           } catch (_) {
             continue;
           }
         }
         
-        if (scalerJsonString == null) {
-          throw Exception('Scaler info file not found');
+        if (metadataJsonString == null) {
+          throw Exception('Metadata file not found');
         }
       } catch (e) {
-        // Fallback: try meta.json format
-        try {
-          final metaPath = modelPath.replaceAll('.onnx', '.meta.json');
-          scalerJsonString = await rootBundle.loadString(metaPath);
-        } catch (_) {
-          throw Exception('Failed to load scaler info: $e');
-        }
+        throw Exception('Failed to load metadata: $e');
       }
 
-      final scalerInfo = json.decode(scalerJsonString) as Map<String, dynamic>;
+      final metadata = json.decode(metadataJsonString) as Map<String, dynamic>;
       
-      // Extract scaler statistics (Python SDK format)
-      _scalerMean = List<double>.from(
-        (scalerInfo['mean_'] as List).map((e) => (e as num).toDouble()),
-      );
-      _scalerScale = List<double>.from(
-        (scalerInfo['scale_'] as List).map((e) => (e as num).toDouble()),
-      );
-      _featureNames = List<String>.from(
-        scalerInfo['feature_names'] as List? ?? 
-        ['MEDIAN_RR', 'HR', 'MEAN_RR', 'SDRR_RMSSD', 'pNN25', 'higuci'],
-      );
+      // Check if this is the new format (Gradient Boosting) or old format
+      final isNewFormat = metadata.containsKey('model_id') && 
+                          metadata.containsKey('classes') &&
+                          metadata.containsKey('features');
+      
+      if (isNewFormat) {
+        // New format: Gradient Boosting model
+        _featureNames = List<String>.from(metadata['features'] as List);
+        final classNames = List<String>.from(metadata['classes'] as List);
+        
+        // New model uses z-score normalization (subject-specific), not scaler
+        // So we don't load scaler mean/scale
+        _scalerMean = [];
+        _scalerScale = [];
+        
+        // Initialize ONNX Runtime
+        final ort = OnnxRuntime();
+        _session = await ort.createSessionFromAsset(modelPath);
 
-      // Initialize ONNX Runtime
-      final ort = OnnxRuntime();
-      _session = await ort.createSessionFromAsset(modelPath);
+        // Create model info
+        _info = ModelInfo(
+          id: metadata['model_id'] as String? ?? 'gradient_boosting_4class',
+          type: 'onnx',
+          checksum: '',
+          inputSchema: _featureNames,
+          classNames: classNames,
+          positiveClass: 'Focused',
+        );
 
-      // Create model info matching Python SDK
-      _info = ModelInfo(
-        id: 'swell_focus_cnn_lstm_onnx_v1_0',
-        type: 'onnx',
-        checksum: '',
-        inputSchema: _featureNames,
-        classNames: ['Focused', 'time pressure', 'Distracted'],
-        positiveClass: 'Focused',
-      );
+        _metadata = {
+          'model_id': _info.id,
+          'version': '1.0',
+          'type': 'onnx',
+          'labels': _info.classNames,
+          'feature_names': _featureNames,
+          'input_preprocessing': metadata['input_preprocessing'] as String? ?? 'subject_specific_zscore',
+        };
+      } else {
+        // Old format: CNN-LSTM with scaler
+        _scalerMean = List<double>.from(
+          (metadata['mean_'] as List).map((e) => (e as num).toDouble()),
+        );
+        _scalerScale = List<double>.from(
+          (metadata['scale_'] as List).map((e) => (e as num).toDouble()),
+        );
+        _featureNames = List<String>.from(
+          metadata['feature_names'] as List? ?? 
+          ['MEDIAN_RR', 'HR', 'MEAN_RR', 'SDRR_RMSSD', 'pNN25', 'higuci'],
+        );
 
-      _metadata = {
-        'model_id': _info.id,
-        'version': '1.0',
-        'type': 'onnx',
-        'labels': _info.classNames,
-        'feature_names': _featureNames,
-      };
+        // Initialize ONNX Runtime
+        final ort = OnnxRuntime();
+        _session = await ort.createSessionFromAsset(modelPath);
+
+        // Create model info matching Python SDK
+        _info = ModelInfo(
+          id: 'swell_focus_cnn_lstm_onnx_v1_0',
+          type: 'onnx',
+          checksum: '',
+          inputSchema: _featureNames,
+          classNames: ['Focused', 'time pressure', 'Distracted'],
+          positiveClass: 'Focused',
+        );
+
+        _metadata = {
+          'model_id': _info.id,
+          'version': '1.0',
+          'type': 'onnx',
+          'labels': _info.classNames,
+          'feature_names': _featureNames,
+        };
+      }
 
       _isLoaded = true;
     } catch (e) {
@@ -108,7 +141,13 @@ class ONNXRuntimeModel implements OnDeviceModel {
   }
 
   /// Normalize features using scaler statistics (matching Python SDK)
+  /// For new model, features should already be z-score normalized (subject-specific)
   List<double> _normalizeFeatures(List<double> features) {
+    // If no scaler (new model), features should already be normalized
+    if (_scalerMean.isEmpty || _scalerScale.isEmpty) {
+      return features;
+    }
+
     if (features.length != _scalerMean.length) {
       throw Exception(
         'Feature count mismatch: expected ${_scalerMean.length}, got ${features.length}',
@@ -155,15 +194,33 @@ class ONNXRuntimeModel implements OnDeviceModel {
         throw Exception('ONNX inference returned no outputs');
       }
 
-      // Extract logits from output
-      final logits = await _extractLogits(outputs);
-
-      if (logits.isEmpty) {
-        throw Exception('ONNX inference produced empty logits');
+      // Handle different output formats
+      // New model may output both label and probabilities
+      // Old model outputs logits that need softmax
+      
+      // Try to extract probabilities directly first
+      List<double> probabilities;
+      try {
+        // Check if output is already probabilities (new model format)
+        final probData = await _extractProbabilities(outputs);
+        if (probData.isNotEmpty && probData.length == _info.classNames!.length) {
+          probabilities = probData;
+        } else {
+          // Extract logits and apply softmax
+          final logits = await _extractLogits(outputs);
+          if (logits.isEmpty) {
+            throw Exception('ONNX inference produced empty logits');
+          }
+          probabilities = _softmax(logits);
+        }
+      } catch (e) {
+        // Fallback: extract logits
+        final logits = await _extractLogits(outputs);
+        if (logits.isEmpty) {
+          throw Exception('ONNX inference produced empty logits');
+        }
+        probabilities = _softmax(logits);
       }
-
-      // Apply softmax to get probabilities
-      final probabilities = _softmax(logits);
 
       // Return as map matching Python SDK format
       final result = <String, double>{};

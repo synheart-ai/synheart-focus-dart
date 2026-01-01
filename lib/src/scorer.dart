@@ -29,7 +29,7 @@ class FocusResult {
     required Map<String, double> features,
     required Map<String, dynamic> model,
   }) {
-    // Find top-1 focus state (matching Python SDK)
+    // Find top-1 focus state (matching Python implementation)
     String topState = 'Focused';
     double maxProb = 0.0;
     probabilities.forEach((state, prob) {
@@ -40,13 +40,25 @@ class FocusResult {
     });
     final confidence = maxProb;
 
-    // Calculate focus score (matching Python SDK FocusResult.from_inference)
+    // Calculate focus score based on class
+    // For 4-class model: Bored, Focused, Anxious, Overload
+    // For 3-class model: Focused, time pressure, Distracted
     double focusScore;
     if (topState == 'Focused') {
       focusScore = 70.0 + (confidence * 30.0);  // 70-100
     } else if (topState == 'time pressure') {
       focusScore = 40.0 + (confidence * 30.0);  // 40-70
-    } else {  // Distracted
+    } else if (topState == 'Bored') {
+      // Bored: low engagement, score 30-50
+      focusScore = 30.0 + (confidence * 20.0);
+    } else if (topState == 'Anxious') {
+      // Anxious: heightened arousal, reduced efficiency, score 20-40
+      focusScore = 20.0 + (confidence * 20.0);
+    } else if (topState == 'Overload') {
+      // Overload: cognitive overload, score 0-20
+      focusScore = confidence * 20.0;
+    } else {
+      // Distracted or unknown
       focusScore = confidence * 40.0;  // 0-40
     }
     focusScore = focusScore.clamp(0.0, 100.0);
@@ -88,7 +100,10 @@ class FocusScorer {
       'id': modelInfo.id,
       'version': '1.0',
       'type': modelInfo.type,
-      'labels': modelInfo.classNames ?? ['Focused', 'time pressure', 'Distracted'],
+      'labels': modelInfo.classNames ?? 
+          (modelInfo.classNames?.length == 4 
+              ? ['Bored', 'Focused', 'Anxious', 'Overload']
+              : ['Focused', 'time pressure', 'Distracted']),
       'feature_names': modelInfo.inputSchema,
       'num_classes': (modelInfo.classNames ?? []).length,
       'num_features': modelInfo.inputSchema.length,
