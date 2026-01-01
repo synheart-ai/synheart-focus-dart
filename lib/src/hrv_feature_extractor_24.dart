@@ -8,22 +8,22 @@ class HRVFeatureVector {
 }
 
 /// HRV Feature extractor matching Python HRVInference.extract_hrv_features()
-/// 
+///
 /// ⚠️ IMPORTANT SCIENTIFIC NOTES:
-/// 
+///
 /// 1. Normalization Order: This extractor expects NORMALIZED IBIs (z-score normalized).
 ///    Features extracted from normalized IBIs are dimensionless and lose physiological units.
 ///    This matches the Python training pipeline but has scientific limitations.
-/// 
+///
 /// 2. NN50/pNN50: With HR-derived IBIs at 1 Hz sampling, NN50 becomes noisy and unreliable.
 ///    These features are included for model compatibility but should be interpreted cautiously.
-/// 
+///
 /// 3. Frequency Domain: Properly interpolates irregular IBI intervals to uniform 4 Hz grid
 ///    before applying Welch's method for PSD estimation.
-/// 
+///
 /// 4. UHF Band (0.40-1.00 Hz): Included for model compatibility, but UHF is mostly noise
 ///    with HR-derived IBIs and is rarely used in ECG-grade HRV analysis.
-/// 
+///
 /// Extracts 24 features:
 /// - Time domain (9): mean_rr, std_rr, min_rr, max_rr, range_rr, rmssd, sdnn, nn50, pnn50
 /// - Frequency domain (11): VLF, LF, HF, UHF powers, total_power, lf_hf_ratio, normalized powers
@@ -31,7 +31,7 @@ class HRVFeatureVector {
 class HRVFeatureExtractor24 {
   /// Sampling frequency for frequency domain analysis (Hz)
   static const double fs = 4.0;
-  
+
   /// Frequency bands matching Python implementation
   static const Map<String, List<double>> freqBands = {
     'VLF': [0.003, 0.04],
@@ -69,13 +69,13 @@ class HRVFeatureExtractor24 {
   ];
 
   /// Extract 24 HRV features from IBI intervals (in milliseconds)
-  /// 
+  ///
   /// Input: ibi_ms - list of inter-beat intervals in milliseconds
   /// Returns: HRVFeatureVector with 24 features
   HRVFeatureVector extractHRVFeatures(List<double> ibiMs) {
     // Convert IBI from ms to seconds (rr)
     final rr = ibiMs.map((x) => x / 1000.0).toList();
-    
+
     if (rr.isEmpty) {
       throw ArgumentError('Empty RR intervals');
     }
@@ -91,26 +91,35 @@ class HRVFeatureExtractor24 {
     final minRr = rr.reduce((a, b) => a < b ? a : b);
     final maxRr = rr.reduce((a, b) => a > b ? a : b);
     final rangeRr = maxRr - minRr;
-    
+
     // RMSSD: Root mean square of successive differences
-    final rmssd = diffRr.isEmpty 
-        ? 0.0 
-        : math.sqrt(diffRr.map((d) => d * d).reduce((a, b) => a + b) / diffRr.length);
-    
+    final rmssd = diffRr.isEmpty
+        ? 0.0
+        : math.sqrt(
+            diffRr.map((d) => d * d).reduce((a, b) => a + b) / diffRr.length,
+          );
+
     // SDNN: Standard deviation of RR intervals (same as std_rr)
     final sdnn = stdRr;
-    
+
     // NN50: Number of pairs of successive NN intervals differing by more than 50ms
     // ⚠️ NOTE: With HR-derived IBIs at 1 Hz sampling, NN50 is noisy and unreliable.
     // This is included for model compatibility but should be interpreted cautiously.
     final nn50 = diffRr.where((d) => d.abs() > 0.05).length;
-    
+
     // pNN50: Percentage of NN50
     final pnn50 = diffRr.isEmpty ? 0.0 : (nn50 / diffRr.length) * 100.0;
 
     final timeFeats = [
-      meanRr, stdRr, minRr, maxRr, rangeRr,
-      rmssd, sdnn, nn50.toDouble(), pnn50,
+      meanRr,
+      stdRr,
+      minRr,
+      maxRr,
+      rangeRr,
+      rmssd,
+      sdnn,
+      nn50.toDouble(),
+      pnn50,
     ];
 
     // ---------------- FREQUENCY DOMAIN (11) ----------------
@@ -121,7 +130,7 @@ class HRVFeatureExtractor24 {
     for (int i = 1; i < rr.length; i++) {
       t.add(t[i - 1] + rr[i - 1]);
     }
-    
+
     if (t.isEmpty || t.last <= 0) {
       // Fallback: use zero power for all bands
       final freqFeats = List.filled(11, 0.0);
@@ -135,7 +144,7 @@ class HRVFeatureExtractor24 {
     for (double time = 0.0; time < t.last; time += 1.0 / fs) {
       uniformT.add(time);
     }
-    
+
     if (uniformT.isEmpty) {
       final freqFeats = List.filled(11, 0.0);
       final statFeats = _computeStatisticalFeatures(rr);
@@ -145,13 +154,17 @@ class HRVFeatureExtractor24 {
 
     // Interpolate RR values to uniform grid
     final interpRr = _interpolate(t, rr, uniformT);
-    
+
     // Remove mean (detrend)
     final meanInterp = _mean(interpRr);
     final detrendedRr = interpRr.map((x) => x - meanInterp).toList();
 
     // Compute power spectral density using Welch's method
-    final psdResult = _welch(detrendedRr, fs: fs, nperseg: math.min(256, detrendedRr.length));
+    final psdResult = _welch(
+      detrendedRr,
+      fs: fs,
+      nperseg: math.min(256, detrendedRr.length),
+    );
     final freqs = psdResult['freqs'] as List<double>;
     final psd = psdResult['psd'] as List<double>;
 
@@ -161,10 +174,10 @@ class HRVFeatureExtractor24 {
       final band = entry.key;
       final lo = entry.value[0];
       final hi = entry.value[1];
-      
+
       // ⚠️ NOTE: UHF band (0.40-1.00 Hz) is included for model compatibility,
       // but is mostly noise with HR-derived IBIs and rarely used in ECG-grade HRV analysis.
-      
+
       double power = 0.0;
       for (int i = 0; i < freqs.length; i++) {
         if (freqs[i] >= lo && freqs[i] <= hi) {
@@ -201,7 +214,7 @@ class HRVFeatureExtractor24 {
     final statFeats = _computeStatisticalFeatures(rr);
 
     final allFeats = [...timeFeats, ...freqFeats, ...statFeats];
-    
+
     if (allFeats.length != 24) {
       throw StateError('Expected 24 features, got ${allFeats.length}');
     }
@@ -212,24 +225,29 @@ class HRVFeatureExtractor24 {
   /// Compute statistical features: skewness, kurtosis, median, IQR
   List<double> _computeStatisticalFeatures(List<double> rr) {
     final sortedRr = List<double>.from(rr)..sort();
-    
+
     // Skewness
     final mean = _mean(rr);
     final std = _std(rr);
     final skewness = std > 0
-        ? rr.map((x) => math.pow((x - mean) / std, 3)).reduce((a, b) => a + b) / rr.length
+        ? rr.map((x) => math.pow((x - mean) / std, 3)).reduce((a, b) => a + b) /
+              rr.length
         : 0.0;
-    
+
     // Kurtosis
     final kurtosis = std > 0
-        ? rr.map((x) => math.pow((x - mean) / std, 4)).reduce((a, b) => a + b) / rr.length - 3.0
+        ? rr.map((x) => math.pow((x - mean) / std, 4)).reduce((a, b) => a + b) /
+                  rr.length -
+              3.0
         : 0.0;
-    
+
     // Median
     final median = sortedRr.length % 2 == 1
         ? sortedRr[sortedRr.length ~/ 2]
-        : (sortedRr[sortedRr.length ~/ 2 - 1] + sortedRr[sortedRr.length ~/ 2]) / 2.0;
-    
+        : (sortedRr[sortedRr.length ~/ 2 - 1] +
+                  sortedRr[sortedRr.length ~/ 2]) /
+              2.0;
+
     // IQR (Interquartile Range)
     final q1Idx = sortedRr.length ~/ 4;
     final q3Idx = (3 * sortedRr.length) ~/ 4;
@@ -259,9 +277,9 @@ class HRVFeatureExtractor24 {
   double _std(List<double> values) {
     if (values.length < 2) return 0.0;
     final mean = _mean(values);
-    final variance = values
-        .map((x) => math.pow(x - mean, 2))
-        .reduce((a, b) => a + b) / (values.length - 1);
+    final variance =
+        values.map((x) => math.pow(x - mean, 2)).reduce((a, b) => a + b) /
+        (values.length - 1);
     return math.sqrt(variance);
   }
 
@@ -270,7 +288,7 @@ class HRVFeatureExtractor24 {
     if (x.length != y.length || x.length < 2) {
       throw ArgumentError('Invalid interpolation input');
     }
-    
+
     final yNew = <double>[];
     for (final xVal in xNew) {
       if (xVal <= x.first) {
@@ -323,10 +341,7 @@ class HRVFeatureExtractor24 {
     // Scale by sampling frequency
     final scaledPsd = psd.map((p) => p / fs).toList();
 
-    return {
-      'freqs': freqs,
-      'psd': scaledPsd,
-    };
+    return {'freqs': freqs, 'psd': scaledPsd};
   }
 
   /// Apply Hann window
@@ -359,16 +374,12 @@ class HRVFeatureExtractor24 {
         real += data[j] * math.cos(angle);
         imag += data[j] * math.sin(angle);
       }
-      
+
       // Power = |FFT|^2 / n
       final power = (real * real + imag * imag) / n;
       psd.add(power);
     }
 
-    return {
-      'freqs': freqs,
-      'psd': psd,
-    };
+    return {'freqs': freqs, 'psd': psd};
   }
 }
-

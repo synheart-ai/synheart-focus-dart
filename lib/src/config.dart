@@ -67,8 +67,10 @@ class FocusConfig {
     this.behaviorWeight = 0.4,
     this.smoothingFactor = 0.3,
     this.enableDebugLogging = false,
-  }) : assert(hsiWeight + behaviorWeight == 1.0,
-            'hsiWeight and behaviorWeight must sum to 1.0');
+  }) : assert(
+         hsiWeight + behaviorWeight == 1.0,
+         'hsiWeight and behaviorWeight must sum to 1.0',
+       );
 
   /// Default configuration
   static const FocusConfig defaultConfig = FocusConfig();

@@ -39,17 +39,14 @@ class AdaptiveBaseline {
     double? initialHrStd,
     double? initialHrvMean,
     double? initialHrvStd,
-  })  : _hrMean = initialHrMean ?? _populationHrMean,
-        _hrStd = initialHrStd ?? _populationHrStd,
-        _hrvMean = initialHrvMean ?? _populationHrvMean,
-        _hrvStd = initialHrvStd ?? _populationHrvStd,
-        _lastUpdate = DateTime.now().toUtc();
+  }) : _hrMean = initialHrMean ?? _populationHrMean,
+       _hrStd = initialHrStd ?? _populationHrStd,
+       _hrvMean = initialHrvMean ?? _populationHrvMean,
+       _hrvStd = initialHrvStd ?? _populationHrvStd,
+       _lastUpdate = DateTime.now().toUtc();
 
   /// Add new physiological samples
-  void addSamples({
-    required double hrBpm,
-    required double hrvSdnn,
-  }) {
+  void addSamples({required double hrBpm, required double hrvSdnn}) {
     _hrSamples.add(hrBpm);
     _hrvSamples.add(hrvSdnn);
 
@@ -179,7 +176,7 @@ class AdaptiveBaseline {
 
     final variance =
         values.map((x) => pow(x - mean, 2)).reduce((a, b) => a + b) /
-            (values.length - 1);
+        (values.length - 1);
 
     return sqrt(variance);
   }
@@ -280,7 +277,7 @@ class AdaptiveBaselineFactory {
 
     final variance =
         values.map((x) => pow(x - mean, 2)).reduce((a, b) => a + b) /
-            (values.length - 1);
+        (values.length - 1);
 
     return sqrt(variance);
   }

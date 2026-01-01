@@ -5,12 +5,12 @@ import 'feature_extractor.dart';
 /// Focus Score result matching Python SDK FocusResult format
 class FocusResult {
   final DateTime timestamp;
-  final String focusState;  // "Focused", "time pressure", or "Distracted"
-  final double focusScore;  // 0-100
-  final double confidence;  // 0-1 (top-1 probability)
-  final Map<String, double> probabilities;  // All label probabilities
-  final Map<String, double> features;  // Extracted features
-  final Map<String, dynamic> model;  // Model metadata
+  final String focusState; // "Focused", "time pressure", or "Distracted"
+  final double focusScore; // 0-100
+  final double confidence; // 0-1 (top-1 probability)
+  final Map<String, double> probabilities; // All label probabilities
+  final Map<String, double> features; // Extracted features
+  final Map<String, dynamic> model; // Model metadata
 
   FocusResult({
     required this.timestamp,
@@ -45,9 +45,9 @@ class FocusResult {
     // For 3-class model: Focused, time pressure, Distracted
     double focusScore;
     if (topState == 'Focused') {
-      focusScore = 70.0 + (confidence * 30.0);  // 70-100
+      focusScore = 70.0 + (confidence * 30.0); // 70-100
     } else if (topState == 'time pressure') {
-      focusScore = 40.0 + (confidence * 30.0);  // 40-70
+      focusScore = 40.0 + (confidence * 30.0); // 40-70
     } else if (topState == 'Bored') {
       // Bored: low engagement, score 30-50
       focusScore = 30.0 + (confidence * 20.0);
@@ -59,7 +59,7 @@ class FocusResult {
       focusScore = confidence * 20.0;
     } else {
       // Distracted or unknown
-      focusScore = confidence * 40.0;  // 0-40
+      focusScore = confidence * 40.0; // 0-40
     }
     focusScore = focusScore.clamp(0.0, 100.0);
 
@@ -100,8 +100,9 @@ class FocusScorer {
       'id': modelInfo.id,
       'version': '1.0',
       'type': modelInfo.type,
-      'labels': modelInfo.classNames ?? 
-          (modelInfo.classNames?.length == 4 
+      'labels':
+          modelInfo.classNames ??
+          (modelInfo.classNames?.length == 4
               ? ['Bored', 'Focused', 'Anxious', 'Overload']
               : ['Focused', 'time pressure', 'Distracted']),
       'feature_names': modelInfo.inputSchema,
@@ -117,4 +118,3 @@ class FocusScorer {
     );
   }
 }
-

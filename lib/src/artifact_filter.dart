@@ -92,8 +92,9 @@ class ArtifactFilter {
         : 1.0 - (motionMagnitude / motionThreshold);
 
     // Physiological plausibility
-    final validCount =
-        rrIntervalsMs.where((rr) => rr >= minRrMs && rr <= maxRrMs).length;
+    final validCount = rrIntervalsMs
+        .where((rr) => rr >= minRrMs && rr <= maxRrMs)
+        .length;
     final plausibilityScore = validCount / rrIntervalsMs.length;
 
     // Consistency score (low variance in successive differences)
@@ -108,7 +109,7 @@ class ArtifactFilter {
         final meanDiff = diffs.reduce((a, b) => a + b) / diffs.length;
         final varianceDiff =
             diffs.map((d) => pow(d - meanDiff, 2)).reduce((a, b) => a + b) /
-                diffs.length;
+            diffs.length;
 
         // Lower variance = higher consistency
         consistencyScore = 1.0 / (1.0 + sqrt(varianceDiff) / 100.0);
