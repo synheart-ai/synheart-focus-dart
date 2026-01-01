@@ -85,10 +85,9 @@ class JsonLinearModel implements OnDeviceModel {
       return 1.0 / (1.0 + exp(-m));
     }
   }
-  
+
   @override
   Future<void> dispose() async {
     // No resources to dispose
   }
 }
-

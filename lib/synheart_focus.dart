@@ -26,4 +26,3 @@ export 'src/models/model_factory.dart';
 export 'src/models/onnx_runtime.dart';
 export 'src/models/json_linear_model.dart';
 export 'src/models/coreml_ios.dart';
-

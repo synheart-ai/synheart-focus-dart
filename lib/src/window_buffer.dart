@@ -10,7 +10,7 @@ class WindowBuffer<T> {
   List<T>? push(DateTime ts, T v, DateTime Function(T) getTs) {
     _buf.add(v);
     _buf.removeWhere((x) => ts.difference(getTs(x)) > window);
-    if (_anchor == null) _anchor = ts;
+    _anchor ??= ts;
     final elapsed = ts.difference(_anchor!);
     if (elapsed >= hop) {
       _anchor = ts;
@@ -19,4 +19,3 @@ class WindowBuffer<T> {
     return null;
   }
 }
-
