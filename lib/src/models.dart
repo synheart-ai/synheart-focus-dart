@@ -23,14 +23,15 @@ class HSIData {
   });
 
   Map<String, dynamic> toJson() => {
-        'hr': hr,
-        'hrvRmssd': hrvRmssd,
-        'stressIndex': stressIndex,
-        'motionIntensity': motionIntensity,
-      };
+    'hr': hr,
+    'hrvRmssd': hrvRmssd,
+    'stressIndex': stressIndex,
+    'motionIntensity': motionIntensity,
+  };
 
   @override
-  String toString() => 'HSIData(hr: $hr, hrvRmssd: $hrvRmssd, '
+  String toString() =>
+      'HSIData(hr: $hr, hrvRmssd: $hrvRmssd, '
       'stressIndex: $stressIndex, motionIntensity: $motionIntensity)';
 }
 
@@ -52,13 +53,14 @@ class BehaviorData {
   });
 
   Map<String, dynamic> toJson() => {
-        'taskSwitchRate': taskSwitchRate,
-        'interactionBurstiness': interactionBurstiness,
-        'idleRatio': idleRatio,
-      };
+    'taskSwitchRate': taskSwitchRate,
+    'interactionBurstiness': interactionBurstiness,
+    'idleRatio': idleRatio,
+  };
 
   @override
-  String toString() => 'BehaviorData(taskSwitchRate: $taskSwitchRate, '
+  String toString() =>
+      'BehaviorData(taskSwitchRate: $taskSwitchRate, '
       'interactionBurstiness: $interactionBurstiness, idleRatio: $idleRatio)';
 }
 
@@ -88,14 +90,15 @@ class FocusState {
   });
 
   Map<String, dynamic> toJson() => {
-        'focusScore': focusScore,
-        'focusLabel': focusLabel,
-        'confidence': confidence,
-        'timestamp': timestamp.toIso8601String(),
-        if (metadata != null) 'metadata': metadata,
-      };
+    'focusScore': focusScore,
+    'focusLabel': focusLabel,
+    'confidence': confidence,
+    'timestamp': timestamp.toIso8601String(),
+    if (metadata != null) 'metadata': metadata,
+  };
 
   @override
-  String toString() => 'FocusState(focusScore: $focusScore, '
+  String toString() =>
+      'FocusState(focusScore: $focusScore, '
       'focusLabel: $focusLabel, confidence: $confidence)';
 }

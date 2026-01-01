@@ -11,6 +11,7 @@ export 'src/models.dart';
 
 // Feature extraction and scoring
 export 'src/feature_extractor.dart';
+export 'src/hrv_feature_extractor_24.dart';
 export 'src/scorer.dart';
 export 'src/hrv_features.dart';
 

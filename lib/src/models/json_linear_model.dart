@@ -26,8 +26,9 @@ class JsonLinearModel implements OnDeviceModel {
   static Future<JsonLinearModel> loadFromAsset(String assetPath) async {
     final text = await rootBundle.loadString(assetPath);
     final m = json.decode(text) as Map<String, dynamic>;
-    final schema =
-        List<String>.from(m['schema']['input_names'] as List<dynamic>);
+    final schema = List<String>.from(
+      m['schema']['input_names'] as List<dynamic>,
+    );
     final mean = (m['schema']['normalization']['mean'] as List)
         .map((e) => (e as num).toDouble())
         .toList();
@@ -52,12 +53,7 @@ class JsonLinearModel implements OnDeviceModel {
       useSig,
       sa,
       sb,
-      ModelInfo(
-        id: id,
-        type: fmt,
-        checksum: checksum,
-        inputSchema: schema,
-      ),
+      ModelInfo(id: id, type: fmt, checksum: checksum, inputSchema: schema),
     );
   }
 
