@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:synheart_focus/synheart_focus.dart';
 import 'package:synheart_wear/synheart_wear.dart';
@@ -36,14 +37,20 @@ class _FocusTestPageState extends State<FocusTestPage> {
   bool _isInitialized = false;
   bool _isRunning = false;
   String _status = 'Not initialized';
-  
+
+  // SynheartWear SDK instance
+  SynheartWear? _synheartWear;
+  StreamSubscription<WearMetrics>? _hrStreamSubscription;
+  bool _wearableConnected = false;
+  String _deviceInfo = '';
+
   // Current inference result
   FocusResult? _currentResult;
-  
+
   // Timer for continuous HR data generation
   DateTime? _startTime;
   int _dataPointCount = 0;
-  
+
   // Timer for window tracking
   int _windowElapsedSeconds = 0;
   int _totalElapsedSeconds = 0; // Total elapsed time since start
@@ -54,60 +61,224 @@ class _FocusTestPageState extends State<FocusTestPage> {
     _initializeEngine();
     _initializeWearable();
   }
-  
-  @override
-  void dispose() {
-    _hrStreamSubscription?.cancel();
-    _synheartWear?.dispose();
-    super.dispose();
+
+  // ──────────────────────────────────────────────────────────────
+  // SDK Initialization
+  // ──────────────────────────────────────────────────────────────
+  void _initializeSDK() {
+    // Initialize SDK with platform-appropriate adapter
+    final adapters = <DeviceAdapter>{};
+
+    if (Platform.isIOS) {
+      adapters.add(DeviceAdapter.appleHealthKit);
+      debugPrint('📱 Initialized Health SDK for iOS (HealthKit)');
+    } else if (Platform.isAndroid) {
+      // For Android, we use AppleHealthKit adapter which uses health package
+      // The health package automatically handles Android Health Connect
+      adapters.add(DeviceAdapter.appleHealthKit);
+      debugPrint(
+        '📱 Initialized Health SDK for Android (Health Connect via health package)',
+      );
+    } else {
+      adapters.add(DeviceAdapter.appleHealthKit);
+      debugPrint('📱 Initialized Health SDK (default)');
+    }
+
+    _synheartWear =
+        SynheartWear(config: SynheartWearConfig.withAdapters(adapters));
   }
-  
+
+  // ──────────────────────────────────────────────────────────────
+  // Wearable Connection
+  // ──────────────────────────────────────────────────────────────
   Future<void> _initializeWearable() async {
+    _updateStatus('Checking permissions...', error: '');
+
     try {
-      // Initialize SynheartWear SDK
-      final adapters = <DeviceAdapter>{
-        DeviceAdapter.appleHealthKit, // Uses Health Connect on Android
-      };
+      // Initialize SDK instance
+      _initializeSDK();
 
-      _synheartWear = SynheartWear(
-        config: SynheartWearConfig.withAdapters(adapters),
+      // Initialize SDK first (only when user clicks toggle)
+      // This is the first time we initialize, so it won't trigger permission dialogs
+      await _synheartWear!.initialize();
+
+      // First, check if permissions are already granted
+      final existingConsents = ConsentManager.getAllConsents();
+      final hasExistingPermissions = existingConsents.values.any(
+        (status) => status == ConsentStatus.granted,
       );
 
-      // Request permissions
-      final permissionsGranted = await _synheartWear!.requestPermissions(
-        permissions: {
-          PermissionType.heartRate,
-        },
-        reason: 'This app needs access to your heart rate data to analyze cognitive focus.',
-      );
+      bool granted = false;
 
-      if (!permissionsGranted) {
-        setState(() {
-          _status = 'Permissions denied';
-          _deviceInfo = 'Please grant health permissions in Settings';
-        });
-        print('⚠️ Health permissions not granted');
-        return;
+      if (hasExistingPermissions) {
+        // Permissions already exist, just verify they're still valid
+        debugPrint('✅ Existing permissions found, verifying...');
+        granted = true;
+      } else {
+        // No existing permissions, request them
+        _updateStatus('Requesting permissions...', error: '');
+
+        // Request permissions for health data
+        // Note: Health Connect on Android doesn't support HRV_SDNN, so exclude it on Android
+        Set<PermissionType> permissions;
+        if (Platform.isAndroid) {
+          // Health Connect doesn't support DISTANCE_WALKING_RUNNING
+          // Request only supported data types
+          permissions = {
+            PermissionType.heartRate,
+            PermissionType.heartRateVariability, // RMSSD on Android
+            PermissionType.steps,
+            PermissionType.calories,
+            // Distance is not supported by Health Connect
+          };
+          debugPrint('📱 Requesting Android Health Connect permissions...');
+        } else {
+          // iOS HealthKit supports all types
+          permissions = {
+            PermissionType.heartRate,
+            PermissionType.heartRateVariability,
+            PermissionType.steps,
+            PermissionType.calories,
+            PermissionType.distance,
+          };
+          debugPrint('📱 Requesting iOS HealthKit permissions...');
+        }
+
+        final result = await _synheartWear!.requestPermissions(
+          permissions: permissions,
+          reason:
+              'This app needs access to your health data from Apple Health or Health Connect to provide insights.',
+        );
+
+        // Check if any permissions were granted
+        granted = result.values.any(
+          (status) => status == ConsentStatus.granted,
+        );
+
+        if (!granted) {
+          if (Platform.isAndroid) {
+            throw Exception(
+              'Permissions were not granted. '
+              'Please ensure Health Connect is installed and grant permissions when prompted.',
+            );
+          } else {
+            throw Exception('Permissions were not granted');
+          }
+        }
       }
 
-      // Initialize the SDK
-      await _synheartWear!.initialize();
-      
-      // Check initial connection
-      final initialMetrics = await _synheartWear!.readMetrics();
-      if (initialMetrics != null) {
-        setState(() {
-          _wearableConnected = true;
-          _deviceInfo = 'Device: ${initialMetrics.deviceId ?? "Unknown"}';
-        });
-        print('✓ Wearable device connected: ${initialMetrics.deviceId}');
+      // Try to read metrics to verify connection
+      try {
+        final metrics = await _synheartWear!.readMetrics();
+
+        if (metrics.hasValidData) {
+          _updateStatus(
+            'Connected successfully!',
+            error: '',
+            isConnected: true,
+            deviceInfo: 'Device: ${metrics.deviceId}',
+          );
+          debugPrint('✓ Wearable device connected: ${metrics.deviceId}');
+        } else {
+          _updateStatus(
+            'Connected! (No data available yet)',
+            error: '',
+            isConnected: true,
+            deviceInfo: 'Connected! (No data available yet)',
+          );
+        }
+      } catch (e) {
+        // If reading fails but permissions are granted, still consider connected
+        // This handles cases where permissions are granted but no data exists
+        if (granted) {
+          _updateStatus(
+            'Connected! (Permissions granted - no data available yet)',
+            error: '',
+            isConnected: true,
+            deviceInfo:
+                'Connected! (Permissions granted - no data available yet)',
+          );
+        } else {
+          rethrow;
+        }
       }
     } catch (e) {
-      print('✗ Error initializing wearable: $e');
-      setState(() {
-        _deviceInfo = 'Error: $e';
-      });
+      final errorMessage = _extractErrorMessage(e.toString());
+      debugPrint('❌ Failed to connect: $e');
+      _updateStatus(
+        'Connection failed',
+        error: errorMessage,
+        isConnected: false,
+        deviceInfo: errorMessage,
+      );
     }
+  }
+
+  // ──────────────────────────────────────────────────────────────
+  // State Management
+  // ──────────────────────────────────────────────────────────────
+  void _updateStatus(
+    String status, {
+    String? error,
+    bool? isConnected,
+    String? deviceInfo,
+  }) {
+    setState(() {
+      _status = status;
+      if (isConnected != null) {
+        _wearableConnected = isConnected;
+      }
+      // Use deviceInfo if provided, otherwise use error
+      if (deviceInfo != null) {
+        _deviceInfo = deviceInfo;
+      } else if (error != null && error.isNotEmpty) {
+        _deviceInfo = error;
+      }
+    });
+  }
+
+  String _extractErrorMessage(String error) {
+    final errorLower = error.toLowerCase();
+
+    if (errorLower.contains('permission denied') ||
+        errorLower.contains('permission') ||
+        errorLower.contains('denied') ||
+        errorLower.contains('not granted')) {
+      String message =
+          'Permissions were denied. Please grant permissions in Apple Health or Health Connect settings.\n\n';
+      if (Platform.isAndroid) {
+        message +=
+            'On emulators, you may need to install Health Connect from the Play Store.';
+      } else {
+        message +=
+            'Note: On simulators, you may need to enable HealthKit in Xcode.';
+      }
+      return message;
+    }
+    if (errorLower.contains('not available') ||
+        errorLower.contains('unavailable') ||
+        errorLower.contains('device unavailable')) {
+      return 'Health data is not available on this device.\n\n'
+          'iOS: Requires Apple HealthKit enabled device (simulators may have limited support).\n'
+          'Android: Requires Health Connect app installed (may not work on all emulators).\n\n'
+          'For best results, use a physical device.';
+    }
+    if (errorLower.contains('invalid metrics') ||
+        errorLower.contains('no valid data')) {
+      String message = 'No health data available yet.\n\n';
+      if (!Platform.isAndroid) {
+        message +=
+            'This is normal on simulators which may not have actual health data.\n';
+      }
+      message +=
+          'Try on a physical device with real health data, or wait for data to be recorded.';
+      return message;
+    }
+    if (errorLower.contains('not initialized') ||
+        errorLower.contains('initialize')) {
+      return 'SDK not initialized. Please try connecting again.';
+    }
+    return error;
   }
 
   Future<void> _initializeEngine() async {
@@ -115,15 +286,15 @@ class _FocusTestPageState extends State<FocusTestPage> {
       print('═══════════════════════════════════════════════════════');
       print('Initializing Focus Engine with Gradient Boosting model...');
       print('═══════════════════════════════════════════════════════\n');
-      
+
       setState(() {
         _status = 'Initializing...';
       });
 
       _engine = FocusEngine(
         config: const FocusConfig(
-          windowSeconds: 60,  // 60-second window
-          stepSeconds: 5,     // 5-second step
+          windowSeconds: 60, // 60-second window
+          stepSeconds: 5, // 5-second step
           minRrCount: 30,
           enableDebugLogging: true,
         ),
@@ -163,11 +334,11 @@ class _FocusTestPageState extends State<FocusTestPage> {
   /// Generate realistic HR data with smooth transitions
   double _generateRealisticHR(DateTime currentTime, DateTime startTime) {
     final elapsed = currentTime.difference(startTime).inSeconds;
-    
+
     // Simulate different cognitive states over time
     double baseHR;
     double variability;
-    
+
     if (elapsed < 120) {
       // First 2 minutes: Focused state
       baseHR = 70.0;
@@ -185,23 +356,23 @@ class _FocusTestPageState extends State<FocusTestPage> {
       baseHR = 95.0;
       variability = 9.0;
     }
-    
+
     // Add some natural variation with smooth transitions
     final random = Random(elapsed);
     final variation = _nextGaussian(random) * variability;
-    
+
     // Add a subtle sine wave for natural HR variation
     final sineVariation = 2.0 * sin(elapsed * 0.1);
-    
+
     final hr = baseHR + variation + sineVariation;
-    
+
     // Clamp to physiological range
     return hr.clamp(45.0, 120.0);
   }
 
   Future<void> _startRealTimeSimulation() async {
     if (!_isInitialized || _engine == null || _isRunning) return;
-    
+
     if (_synheartWear == null) {
       print('⚠️ Wearable service not initialized');
       setState(() {
@@ -241,11 +412,11 @@ class _FocusTestPageState extends State<FocusTestPage> {
     });
 
     // Stream HR data from wearable device (every 1 second)
-    _hrStreamSubscription = _synheartWear!.streamHR(interval: const Duration(seconds: 1))
-        .listen(
+    _hrStreamSubscription =
+        _synheartWear!.streamHR(interval: const Duration(seconds: 1)).listen(
       (metrics) {
         if (!_isRunning) return;
-        
+
         final hr = metrics.getMetric(MetricType.hr);
         if (hr == null) {
           // No HR data available yet
@@ -258,14 +429,17 @@ class _FocusTestPageState extends State<FocusTestPage> {
         // Update device info
         setState(() {
           _wearableConnected = true;
-          _deviceInfo = 'Device: ${metrics.deviceId ?? "Unknown"} | HR: ${hr.toStringAsFixed(0)} bpm';
+          _deviceInfo =
+              'Device: ${metrics.deviceId ?? "Unknown"} | HR: ${hr.toStringAsFixed(0)} bpm';
         });
 
         // Feed HR data to inference engine
-        _engine!.inferFromHrData(
+        _engine!
+            .inferFromHrData(
           hrBpm: hr.toDouble(),
           timestamp: currentTime,
-        ).then((result) {
+        )
+            .then((result) {
           if (result != null) {
             // Update UI with new result
             setState(() {
@@ -278,17 +452,20 @@ class _FocusTestPageState extends State<FocusTestPage> {
             print('  HR: ${hr.toStringAsFixed(0)} BPM');
             print('  State: ${result.focusState}');
             print('  Score: ${result.focusScore.toStringAsFixed(1)}');
-            print('  Confidence: ${(result.confidence * 100).toStringAsFixed(1)}%');
+            print(
+                '  Confidence: ${(result.confidence * 100).toStringAsFixed(1)}%');
             print('  Probabilities: ${result.probabilities}');
           } else {
             // Log data collection status periodically
             final elapsed = currentTime.difference(_startTime!).inSeconds;
             if (elapsed <= 60 && elapsed % 15 == 0) {
               // Log every 15 seconds during first 60 seconds
-              print('[$elapsed s] Collecting data... (${elapsed}/60 seconds) | HR: ${hr.toStringAsFixed(0)} BPM');
+              print(
+                  '[$elapsed s] Collecting data... (${elapsed}/60 seconds) | HR: ${hr.toStringAsFixed(0)} BPM');
             } else if (elapsed > 60 && elapsed % 5 == 0) {
               // Log every 5 seconds after 60 seconds if no inference
-              print('[$elapsed s] Waiting for inference... | HR: ${hr.toStringAsFixed(0)} BPM');
+              print(
+                  '[$elapsed s] Waiting for inference... | HR: ${hr.toStringAsFixed(0)} BPM');
             }
           }
         }).catchError((e) {
@@ -316,6 +493,8 @@ class _FocusTestPageState extends State<FocusTestPage> {
   @override
   void dispose() {
     _stopSimulation();
+    _hrStreamSubscription?.cancel();
+    _synheartWear?.dispose();
     _engine?.dispose();
     super.dispose();
   }
@@ -371,7 +550,8 @@ class _FocusTestPageState extends State<FocusTestPage> {
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            color: _isInitialized ? Colors.green : Colors.orange,
+                            color:
+                                _isInitialized ? Colors.green : Colors.orange,
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -379,7 +559,9 @@ class _FocusTestPageState extends State<FocusTestPage> {
                           _deviceInfo,
                           style: TextStyle(
                             fontSize: 12,
-                            color: _wearableConnected ? Colors.green.shade700 : Colors.grey.shade600,
+                            color: _wearableConnected
+                                ? Colors.green.shade700
+                                : Colors.grey.shade600,
                           ),
                         ),
                       ],
@@ -402,13 +584,13 @@ class _FocusTestPageState extends State<FocusTestPage> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: _totalElapsedSeconds >= 60 
-                      ? Colors.green.shade100 
+                  color: _totalElapsedSeconds >= 60
+                      ? Colors.green.shade100
                       : Colors.orange.shade100,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: _totalElapsedSeconds >= 60 
-                        ? Colors.green.shade300 
+                    color: _totalElapsedSeconds >= 60
+                        ? Colors.green.shade300
                         : Colors.orange.shade300,
                     width: 2,
                   ),
@@ -419,11 +601,11 @@ class _FocusTestPageState extends State<FocusTestPage> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
-                          _totalElapsedSeconds >= 60 
-                              ? Icons.check_circle 
+                          _totalElapsedSeconds >= 60
+                              ? Icons.check_circle
                               : Icons.timer,
-                          color: _totalElapsedSeconds >= 60 
-                              ? Colors.green 
+                          color: _totalElapsedSeconds >= 60
+                              ? Colors.green
                               : Colors.orange,
                           size: 32,
                         ),
@@ -431,8 +613,8 @@ class _FocusTestPageState extends State<FocusTestPage> {
                         Column(
                           children: [
                             Text(
-                              _totalElapsedSeconds < 60 
-                                  ? 'Collecting Data' 
+                              _totalElapsedSeconds < 60
+                                  ? 'Collecting Data'
                                   : 'Window Active',
                               style: TextStyle(
                                 fontSize: 12,
@@ -440,14 +622,14 @@ class _FocusTestPageState extends State<FocusTestPage> {
                               ),
                             ),
                             Text(
-                              _totalElapsedSeconds < 60 
+                              _totalElapsedSeconds < 60
                                   ? '${_totalElapsedSeconds}s / 60s'
                                   : '${_totalElapsedSeconds}s elapsed',
                               style: TextStyle(
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
-                                color: _totalElapsedSeconds >= 60 
-                                    ? Colors.green.shade700 
+                                color: _totalElapsedSeconds >= 60
+                                    ? Colors.green.shade700
                                     : Colors.orange.shade700,
                               ),
                             ),
@@ -460,7 +642,8 @@ class _FocusTestPageState extends State<FocusTestPage> {
                       LinearProgressIndicator(
                         value: _totalElapsedSeconds / 60.0,
                         backgroundColor: Colors.grey.shade300,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(Colors.orange),
                         minHeight: 6,
                       ),
                       const SizedBox(height: 4),
@@ -549,7 +732,7 @@ class _FocusTestPageState extends State<FocusTestPage> {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // Dominant label
                     Container(
                       padding: const EdgeInsets.all(16),
@@ -558,10 +741,10 @@ class _FocusTestPageState extends State<FocusTestPage> {
                         borderRadius: BorderRadius.circular(8),
                         boxShadow: [
                           BoxShadow(
-color: Colors.blue.shade200,
-blurRadius: 4,
-offset: const Offset(0, 2),
-),
+                            color: Colors.blue.shade200,
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
                         ],
                       ),
                       child: Column(
@@ -581,7 +764,8 @@ offset: const Offset(0, 2),
                             decoration: BoxDecoration(
                               color: Colors.blue.shade50,
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.blue.shade300, width: 2),
+                              border: Border.all(
+                                  color: Colors.blue.shade300, width: 2),
                             ),
                             child: Column(
                               children: [
@@ -606,10 +790,10 @@ offset: const Offset(0, 2),
                                   value: _currentResult!.focusScore / 100.0,
                                   backgroundColor: Colors.grey.shade300,
                                   valueColor: AlwaysStoppedAnimation<Color>(
-                                    _currentResult!.focusScore >= 70 
-                                        ? Colors.green 
-                                        : _currentResult!.focusScore >= 40 
-                                            ? Colors.orange 
+                                    _currentResult!.focusScore >= 70
+                                        ? Colors.green
+                                        : _currentResult!.focusScore >= 40
+                                            ? Colors.orange
                                             : Colors.red,
                                   ),
                                   minHeight: 8,
@@ -641,9 +825,9 @@ offset: const Offset(0, 2),
                         ],
                       ),
                     ),
-                    
+
                     const SizedBox(height: 16),
-                    
+
                     // All probabilities
                     Text(
                       'All Class Probabilities:',
@@ -655,15 +839,20 @@ offset: const Offset(0, 2),
                     ),
                     const SizedBox(height: 12),
                     ..._currentResult!.probabilities.entries.map((entry) {
-                      final isDominant = entry.key == _currentResult!.focusState;
+                      final isDominant =
+                          entry.key == _currentResult!.focusState;
                       return Container(
                         margin: const EdgeInsets.only(bottom: 8),
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: isDominant ? Colors.blue.shade100 : Colors.grey.shade100,
+                          color: isDominant
+                              ? Colors.blue.shade100
+                              : Colors.grey.shade100,
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: isDominant ? Colors.blue.shade300 : Colors.grey.shade300,
+                            color: isDominant
+                                ? Colors.blue.shade300
+                                : Colors.grey.shade300,
                             width: isDominant ? 2 : 1,
                           ),
                         ),
@@ -674,8 +863,12 @@ offset: const Offset(0, 2),
                                 entry.key,
                                 style: TextStyle(
                                   fontSize: 16,
-                                  fontWeight: isDominant ? FontWeight.bold : FontWeight.normal,
-                                  color: isDominant ? Colors.blue.shade900 : Colors.grey.shade800,
+                                  fontWeight: isDominant
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                  color: isDominant
+                                      ? Colors.blue.shade900
+                                      : Colors.grey.shade800,
                                 ),
                               ),
                             ),
@@ -686,7 +879,9 @@ offset: const Offset(0, 2),
                                 value: entry.value,
                                 backgroundColor: Colors.grey.shade300,
                                 valueColor: AlwaysStoppedAnimation<Color>(
-                                  isDominant ? Colors.blue : Colors.grey.shade600,
+                                  isDominant
+                                      ? Colors.blue
+                                      : Colors.grey.shade600,
                                 ),
                               ),
                             ),
@@ -699,7 +894,9 @@ offset: const Offset(0, 2),
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
-                                  color: isDominant ? Colors.blue.shade700 : Colors.grey.shade700,
+                                  color: isDominant
+                                      ? Colors.blue.shade700
+                                      : Colors.grey.shade700,
                                 ),
                               ),
                             ),
@@ -707,9 +904,9 @@ offset: const Offset(0, 2),
                         ),
                       );
                     }).toList(),
-                    
+
                     const SizedBox(height: 24),
-                    
+
                     // Features Display
                     Text(
                       'HRV Features (24 features):',
@@ -732,9 +929,11 @@ offset: const Offset(0, 2),
                           padding: const EdgeInsets.all(12),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            children: _currentResult!.features.entries.map((entry) {
+                            children:
+                                _currentResult!.features.entries.map((entry) {
                               return Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 4),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 4),
                                 child: Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
