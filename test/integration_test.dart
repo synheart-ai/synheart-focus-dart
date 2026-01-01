@@ -93,7 +93,10 @@ void main() {
 
       expect(focusState.focusScore, inInclusiveRange(0.0, 1.0));
       expect(focusState.confidence, inInclusiveRange(0.0, 1.0));
-      expect(focusState.focusLabel, isIn(['High Focus', 'Medium Focus', 'Low Focus']));
+      expect(
+        focusState.focusLabel,
+        isIn(['High Focus', 'Medium Focus', 'Low Focus']),
+      );
       expect(focusState.timestamp, isNotNull);
       expect(focusState.metadata, isNotNull);
     });
@@ -119,12 +122,17 @@ void main() {
 
       // Derived fields for HSI compatibility
       // cognitiveLoad can be derived from stress and task switching
-      final cognitiveLoad = ((hsiData.stressIndex + behaviorData.taskSwitchRate) / 2.0)
-          .clamp(0.0, 1.0);
+      final cognitiveLoad =
+          ((hsiData.stressIndex + behaviorData.taskSwitchRate) / 2.0).clamp(
+            0.0,
+            1.0,
+          );
 
       // clarity can be derived from HRV and engagement
-      final clarity = (focusState.focusScore * focusState.confidence)
-          .clamp(0.0, 1.0);
+      final clarity = (focusState.focusScore * focusState.confidence).clamp(
+        0.0,
+        1.0,
+      );
 
       // distraction is inverse of focus
       final distraction = (1.0 - focusState.focusScore).clamp(0.0, 1.0);
@@ -262,7 +270,10 @@ void main() {
 
       final result3 = await engine.infer(hsiData, behaviorDataHighSwitch);
       expect(result3.focusScore, inInclusiveRange(0.0, 1.0));
-      expect(result3.focusScore, lessThan(0.6)); // Should be lower focus with high switching
+      expect(
+        result3.focusScore,
+        lessThan(0.6),
+      ); // Should be lower focus with high switching
     });
 
     test('reset clears engine state', () async {
@@ -324,7 +335,10 @@ void main() {
 
       // Extreme values should generally have lower confidence
       expect(resultNormal.confidence, greaterThan(0.6));
-      expect(resultExtreme.confidence, lessThanOrEqualTo(resultNormal.confidence));
+      expect(
+        resultExtreme.confidence,
+        lessThanOrEqualTo(resultNormal.confidence),
+      );
     });
 
     test('focus labels are assigned correctly', () async {
@@ -342,7 +356,10 @@ void main() {
         idleRatio: 0.03,
       );
 
-      final resultHigh = await engine.infer(hsiDataHighFocus, behaviorDataHighFocus);
+      final resultHigh = await engine.infer(
+        hsiDataHighFocus,
+        behaviorDataHighFocus,
+      );
       expect(resultHigh.focusLabel, anyOf('High Focus', 'Medium Focus'));
 
       // Low focus scenario
@@ -359,7 +376,10 @@ void main() {
         idleRatio: 0.7,
       );
 
-      final resultLow = await engine.infer(hsiDataLowFocus, behaviorDataLowFocus);
+      final resultLow = await engine.infer(
+        hsiDataLowFocus,
+        behaviorDataLowFocus,
+      );
       expect(resultLow.focusLabel, 'Low Focus');
       expect(resultLow.focusScore, lessThan(0.4));
     });
@@ -400,11 +420,7 @@ void main() {
         focusLabel: 'High Focus',
         confidence: 0.85,
         timestamp: DateTime(2025, 1, 1, 12, 0, 0),
-        metadata: {
-          'hsiScore': 0.72,
-          'behaviorScore': 0.79,
-          'rawScore': 0.748,
-        },
+        metadata: {'hsiScore': 0.72, 'behaviorScore': 0.79, 'rawScore': 0.748},
       );
 
       final json = focusState.toJson();
@@ -434,10 +450,7 @@ void main() {
         focusLabel: 'Medium Focus',
         confidence: 0.78,
         timestamp: DateTime.now(),
-        metadata: const {
-          'hsiScore': 0.65,
-          'behaviorScore': 0.72,
-        },
+        metadata: const {'hsiScore': 0.65, 'behaviorScore': 0.72},
       );
 
       // Map to HSI FocusState schema
@@ -462,7 +475,7 @@ void main() {
     test('custom thresholds affect focus labels', () async {
       final customEngine = FocusEngine(
         config: const FocusConfig(
-          highFocusThreshold: 0.8,  // Higher threshold
+          highFocusThreshold: 0.8, // Higher threshold
           mediumFocusThreshold: 0.5, // Higher threshold
         ),
       );
@@ -484,7 +497,10 @@ void main() {
 
       // With higher thresholds, same inputs might result in lower label
       expect(result.focusScore, inInclusiveRange(0.0, 1.0));
-      expect(result.focusLabel, isIn(['High Focus', 'Medium Focus', 'Low Focus']));
+      expect(
+        result.focusLabel,
+        isIn(['High Focus', 'Medium Focus', 'Low Focus']),
+      );
 
       customEngine.dispose();
     });
@@ -492,18 +508,12 @@ void main() {
     test('custom weights affect score calculation', () async {
       // Engine favoring HSI
       final hsiEngine = FocusEngine(
-        config: const FocusConfig(
-          hsiWeight: 0.9,
-          behaviorWeight: 0.1,
-        ),
+        config: const FocusConfig(hsiWeight: 0.9, behaviorWeight: 0.1),
       );
 
       // Engine favoring behavior
       final behaviorEngine = FocusEngine(
-        config: const FocusConfig(
-          hsiWeight: 0.1,
-          behaviorWeight: 0.9,
-        ),
+        config: const FocusConfig(hsiWeight: 0.1, behaviorWeight: 0.9),
       );
 
       final hsiData = const HSIData(
