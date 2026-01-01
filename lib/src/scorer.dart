@@ -1,6 +1,5 @@
 import 'models/on_device_model.dart';
 import 'models.dart';
-import 'feature_extractor.dart';
 
 /// Focus Score result matching Python SDK FocusResult format
 class FocusResult {

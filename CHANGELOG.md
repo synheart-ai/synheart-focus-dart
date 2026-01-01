@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-01-01
+
 ### Added
 - Comprehensive integration tests matching synheart-core FocusHead usage pattern (15 tests)
   - Tests for FocusEngine initialization with synheart-core config

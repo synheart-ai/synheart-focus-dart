@@ -44,8 +44,6 @@ class FocusEngine {
   DateTime? _firstDataTime; // Track when we started collecting data
 
   /// Subject-specific statistics for z-score normalization
-  double? _subjectMean;
-  double? _subjectStd;
   final List<double> _subjectIbiHistory = [];
 
   /// Stream controller for updates (from synheart-focus-dart)
@@ -295,9 +293,6 @@ class FocusEngine {
             .reduce((a, b) => a + b) /
         _subjectIbiHistory.length;
     final std = math.sqrt(variance);
-
-    _subjectMean = mean;
-    _subjectStd = std;
 
     // Normalize
     if (std > 0) {
@@ -577,8 +572,6 @@ class FocusEngine {
   void reset() {
     _previousScore = null;
     _lastUpdate = DateTime.now().toUtc();
-    _subjectMean = null;
-    _subjectStd = null;
     _subjectIbiHistory.clear();
     _hrBuffer.clear();
     _lastWindowTime = null;

@@ -1,6 +1,6 @@
-# Synheart Focus
+# Synheart Focus Dart
 
-**On-device cognitive concentration inference from biosignals and behavioral patterns for Flutter applications**
+**On-device cognitive concentration inference from biosignals and behavioral patterns for Dart/Flutter applications**
 
 [![pub package](https://img.shields.io/pub/v/synheart_focus.svg)](https://pub.dev/packages/synheart_focus)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
@@ -25,7 +25,7 @@ Add `synheart_focus` to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  synheart_focus: ^0.0.1
+  synheart_focus: ^0.1.0
 ```
 
 Then run:
@@ -82,7 +82,7 @@ First, add both to your `pubspec.yaml`:
 ```yaml
 dependencies:
   synheart_wear: ^0.2.2    # For wearable data
-  synheart_focus: ^0.0.1   # For focus inference
+  synheart_focus: ^0.1.0   # For focus inference
 ```
 
 Then integrate in your app:
@@ -275,12 +275,12 @@ class BehaviorData {
 
 ## 📱 Example App
 
-Check out the complete examples in the [synheart-focus repository](https://github.com/synheart-ai/synheart-focus/tree/main/examples):
+Check out the example app in the [synheart-focus-flutter repository](https://github.com/synheart-ai/synheart-focus-flutter/tree/main/example):
 
 ```bash
 # Clone the main repository for examples
-git clone https://github.com/synheart-ai/synheart-focus.git
-cd synheart-focus/examples
+git clone https://github.com/synheart-ai/synheart-focus-flutter.git
+cd synheart-focus-flutter/example
 flutter pub get
 flutter run
 ```
@@ -439,14 +439,12 @@ This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENS
 
 ## 🤝 Contributing
 
-We welcome contributions! See our [Contributing Guidelines](https://github.com/synheart-ai/synheart-focus/blob/main/CONTRIBUTING.md) for details.
+We welcome contributions! See our [Contributing Guidelines](https://github.com/synheart-ai/synheart-focus-flutter/blob/main/CONTRIBUTING.md) for details.
 
 ## 🔗 Links
 
-- **Main Repository**: [synheart-focus](https://github.com/synheart-ai/synheart-focus) (Source of Truth)
-- **Documentation**: [Docs](https://github.com/synheart-ai/synheart-focus/tree/main/docs)
-- **Examples**: [Examples](https://github.com/synheart-ai/synheart-focus/tree/main/examples)
-- **Models**: [Pre-trained Models](https://github.com/synheart-ai/synheart-focus/tree/main/models)
+- **Main Repository**: [synheart-focus-flutter](https://github.com/synheart-ai/synheart-focus-flutter) (Source of Truth)
+- **Example App**: [Example](https://github.com/synheart-ai/synheart-focus-flutter/tree/main/example)
 - **Synheart Wear**: [synheart-wear](https://github.com/synheart-ai/synheart-wear)
 - **Synheart Emotion**: [synheart-emotion](https://github.com/synheart-ai/synheart-emotion)
 - **Synheart AI**: [synheart.ai](https://synheart.ai)

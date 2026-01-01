@@ -7,7 +7,6 @@ import 'on_device_model.dart';
 class ONNXRuntimeModel implements OnDeviceModel {
   late final OrtSession _session;
   late final ModelInfo _info;
-  late final Map<String, dynamic> _metadata;
   late final List<double> _scalerMean;
   late final List<double> _scalerScale;
   late final List<String> _featureNames;
@@ -90,15 +89,8 @@ class ONNXRuntimeModel implements OnDeviceModel {
           positiveClass: 'Focused',
         );
 
-        _metadata = {
-          'model_id': _info.id,
-          'version': '1.0',
-          'type': 'onnx',
-          'labels': _info.classNames,
-          'feature_names': _featureNames,
-          'input_preprocessing': metadata['input_preprocessing'] as String? ??
-              'subject_specific_zscore',
-        };
+        // Model metadata is parsed from JSON above; ONNXRuntimeModel currently
+        // exposes metadata via `info` (ModelInfo) and inference outputs.
       } else {
         // Old format: CNN-LSTM with scaler
         _scalerMean = List<double>.from(
@@ -126,13 +118,8 @@ class ONNXRuntimeModel implements OnDeviceModel {
           positiveClass: 'Focused',
         );
 
-        _metadata = {
-          'model_id': _info.id,
-          'version': '1.0',
-          'type': 'onnx',
-          'labels': _info.classNames,
-          'feature_names': _featureNames,
-        };
+        // Model metadata is parsed from JSON above; ONNXRuntimeModel currently
+        // exposes metadata via `info` (ModelInfo) and inference outputs.
       }
 
       _isLoaded = true;
