@@ -62,8 +62,7 @@ class ONNXRuntimeModel implements OnDeviceModel {
       final metadata = json.decode(metadataJsonString) as Map<String, dynamic>;
 
       // Check if this is the new format (Gradient Boosting) or old format
-      final isNewFormat =
-          metadata.containsKey('model_id') &&
+      final isNewFormat = metadata.containsKey('model_id') &&
           metadata.containsKey('classes') &&
           metadata.containsKey('features');
 
@@ -97,8 +96,7 @@ class ONNXRuntimeModel implements OnDeviceModel {
           'type': 'onnx',
           'labels': _info.classNames,
           'feature_names': _featureNames,
-          'input_preprocessing':
-              metadata['input_preprocessing'] as String? ??
+          'input_preprocessing': metadata['input_preprocessing'] as String? ??
               'subject_specific_zscore',
         };
       } else {
@@ -239,11 +237,9 @@ class ONNXRuntimeModel implements OnDeviceModel {
 
       // Return as map matching Python SDK format
       final result = <String, double>{};
-      for (
-        int i = 0;
-        i < _info.classNames!.length && i < probabilities.length;
-        i++
-      ) {
+      for (int i = 0;
+          i < _info.classNames!.length && i < probabilities.length;
+          i++) {
         result[_info.classNames![i]] = probabilities[i];
       }
 
@@ -280,9 +276,8 @@ class ONNXRuntimeModel implements OnDeviceModel {
     final maxLogit = logits.reduce((a, b) => a > b ? a : b);
 
     // Calculate exponentials
-    final expValues = logits
-        .map((logit) => math.exp(logit - maxLogit))
-        .toList();
+    final expValues =
+        logits.map((logit) => math.exp(logit - maxLogit)).toList();
 
     final sumExp = expValues.fold(0.0, (a, b) => a + b);
 

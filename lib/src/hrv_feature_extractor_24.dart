@@ -231,22 +231,22 @@ class HRVFeatureExtractor24 {
     final std = _std(rr);
     final skewness = std > 0
         ? rr.map((x) => math.pow((x - mean) / std, 3)).reduce((a, b) => a + b) /
-              rr.length
+            rr.length
         : 0.0;
 
     // Kurtosis
     final kurtosis = std > 0
         ? rr.map((x) => math.pow((x - mean) / std, 4)).reduce((a, b) => a + b) /
-                  rr.length -
-              3.0
+                rr.length -
+            3.0
         : 0.0;
 
     // Median
     final median = sortedRr.length % 2 == 1
         ? sortedRr[sortedRr.length ~/ 2]
         : (sortedRr[sortedRr.length ~/ 2 - 1] +
-                  sortedRr[sortedRr.length ~/ 2]) /
-              2.0;
+                sortedRr[sortedRr.length ~/ 2]) /
+            2.0;
 
     // IQR (Interquartile Range)
     final q1Idx = sortedRr.length ~/ 4;
@@ -279,7 +279,7 @@ class HRVFeatureExtractor24 {
     final mean = _mean(values);
     final variance =
         values.map((x) => math.pow(x - mean, 2)).reduce((a, b) => a + b) /
-        (values.length - 1);
+            (values.length - 1);
     return math.sqrt(variance);
   }
 

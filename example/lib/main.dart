@@ -84,8 +84,9 @@ class _FocusTestPageState extends State<FocusTestPage> {
       debugPrint('📱 Initialized Health SDK (default)');
     }
 
-    _synheartWear =
-        SynheartWear(config: SynheartWearConfig.withAdapters(adapters));
+    _synheartWear = SynheartWear(
+      config: SynheartWearConfig.withAdapters(adapters),
+    );
   }
 
   // ──────────────────────────────────────────────────────────────
@@ -412,74 +413,80 @@ class _FocusTestPageState extends State<FocusTestPage> {
     });
 
     // Stream HR data from wearable device (every 1 second)
-    _hrStreamSubscription =
-        _synheartWear!.streamHR(interval: const Duration(seconds: 1)).listen(
-      (metrics) {
-        if (!_isRunning) return;
+    _hrStreamSubscription = _synheartWear!
+        .streamHR(interval: const Duration(seconds: 1))
+        .listen(
+          (metrics) {
+            if (!_isRunning) return;
 
-        final hr = metrics.getMetric(MetricType.hr);
-        if (hr == null) {
-          // No HR data available yet
-          return;
-        }
+            final hr = metrics.getMetric(MetricType.hr);
+            if (hr == null) {
+              // No HR data available yet
+              return;
+            }
 
-        _dataPointCount++;
-        final currentTime = DateTime.now();
+            _dataPointCount++;
+            final currentTime = DateTime.now();
 
-        // Update device info
-        setState(() {
-          _wearableConnected = true;
-          _deviceInfo =
-              'Device: ${metrics.deviceId ?? "Unknown"} | HR: ${hr.toStringAsFixed(0)} bpm';
-        });
-
-        // Feed HR data to inference engine
-        _engine!
-            .inferFromHrData(
-          hrBpm: hr.toDouble(),
-          timestamp: currentTime,
-        )
-            .then((result) {
-          if (result != null) {
-            // Update UI with new result
+            // Update device info
             setState(() {
-              _currentResult = result;
+              _wearableConnected = true;
+              _deviceInfo =
+                  'Device: ${metrics.deviceId ?? "Unknown"} | HR: ${hr.toStringAsFixed(0)} bpm';
             });
 
-            // Log to console
-            final elapsed = currentTime.difference(_startTime!).inSeconds;
-            print('[$elapsed s] ✓ Inference completed!');
-            print('  HR: ${hr.toStringAsFixed(0)} BPM');
-            print('  State: ${result.focusState}');
-            print('  Score: ${result.focusScore.toStringAsFixed(1)}');
-            print(
-                '  Confidence: ${(result.confidence * 100).toStringAsFixed(1)}%');
-            print('  Probabilities: ${result.probabilities}');
-          } else {
-            // Log data collection status periodically
-            final elapsed = currentTime.difference(_startTime!).inSeconds;
-            if (elapsed <= 60 && elapsed % 15 == 0) {
-              // Log every 15 seconds during first 60 seconds
-              print(
-                  '[$elapsed s] Collecting data... (${elapsed}/60 seconds) | HR: ${hr.toStringAsFixed(0)} BPM');
-            } else if (elapsed > 60 && elapsed % 5 == 0) {
-              // Log every 5 seconds after 60 seconds if no inference
-              print(
-                  '[$elapsed s] Waiting for inference... | HR: ${hr.toStringAsFixed(0)} BPM');
-            }
-          }
-        }).catchError((e) {
-          print('Error processing HR data: $e');
-        });
-      },
-      onError: (error) {
-        print('Error streaming HR: $error');
-        setState(() {
-          _wearableConnected = false;
-          _deviceInfo = 'Stream error: $error';
-        });
-      },
-    );
+            // Feed HR data to inference engine
+            _engine!
+                .inferFromHrData(hrBpm: hr.toDouble(), timestamp: currentTime)
+                .then((result) {
+                  if (result != null) {
+                    // Update UI with new result
+                    setState(() {
+                      _currentResult = result;
+                    });
+
+                    // Log to console
+                    final elapsed = currentTime
+                        .difference(_startTime!)
+                        .inSeconds;
+                    print('[$elapsed s] ✓ Inference completed!');
+                    print('  HR: ${hr.toStringAsFixed(0)} BPM');
+                    print('  State: ${result.focusState}');
+                    print('  Score: ${result.focusScore.toStringAsFixed(1)}');
+                    print(
+                      '  Confidence: ${(result.confidence * 100).toStringAsFixed(1)}%',
+                    );
+                    print('  Probabilities: ${result.probabilities}');
+                  } else {
+                    // Log data collection status periodically
+                    final elapsed = currentTime
+                        .difference(_startTime!)
+                        .inSeconds;
+                    if (elapsed <= 60 && elapsed % 15 == 0) {
+                      // Log every 15 seconds during first 60 seconds
+                      print(
+                        '[$elapsed s] Collecting data... (${elapsed}/60 seconds) | HR: ${hr.toStringAsFixed(0)} BPM',
+                      );
+                    } else if (elapsed > 60 && elapsed % 5 == 0) {
+                      // Log every 5 seconds after 60 seconds if no inference
+                      print(
+                        '[$elapsed s] Waiting for inference... | HR: ${hr.toStringAsFixed(0)} BPM',
+                      );
+                    }
+                  }
+                })
+                .catchError((e) {
+                  print('Error processing HR data: $e');
+                });
+          },
+          onError: (error) {
+            print('Error streaming HR: $error');
+            setState(() {
+              _wearableConnected = false;
+              _deviceInfo = 'Stream error: $error';
+            });
+          },
+        );
   }
 
   void _stopSimulation() {
@@ -550,8 +557,9 @@ class _FocusTestPageState extends State<FocusTestPage> {
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            color:
-                                _isInitialized ? Colors.green : Colors.orange,
+                            color: _isInitialized
+                                ? Colors.green
+                                : Colors.orange,
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -642,8 +650,9 @@ class _FocusTestPageState extends State<FocusTestPage> {
                       LinearProgressIndicator(
                         value: _totalElapsedSeconds / 60.0,
                         backgroundColor: Colors.grey.shade300,
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(Colors.orange),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Colors.orange,
+                        ),
                         minHeight: 6,
                       ),
                       const SizedBox(height: 4),
@@ -765,7 +774,9 @@ class _FocusTestPageState extends State<FocusTestPage> {
                               color: Colors.blue.shade50,
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
-                                  color: Colors.blue.shade300, width: 2),
+                                color: Colors.blue.shade300,
+                                width: 2,
+                              ),
                             ),
                             child: Column(
                               children: [
@@ -793,8 +804,8 @@ class _FocusTestPageState extends State<FocusTestPage> {
                                     _currentResult!.focusScore >= 70
                                         ? Colors.green
                                         : _currentResult!.focusScore >= 40
-                                            ? Colors.orange
-                                            : Colors.red,
+                                        ? Colors.orange
+                                        : Colors.red,
                                   ),
                                   minHeight: 8,
                                 ),
@@ -929,11 +940,13 @@ class _FocusTestPageState extends State<FocusTestPage> {
                           padding: const EdgeInsets.all(12),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            children:
-                                _currentResult!.features.entries.map((entry) {
+                            children: _currentResult!.features.entries.map((
+                              entry,
+                            ) {
                               return Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 4,
+                                ),
                                 child: Row(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [

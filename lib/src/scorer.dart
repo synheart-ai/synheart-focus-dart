@@ -100,8 +100,7 @@ class FocusScorer {
       'id': modelInfo.id,
       'version': '1.0',
       'type': modelInfo.type,
-      'labels':
-          modelInfo.classNames ??
+      'labels': modelInfo.classNames ??
           (modelInfo.classNames?.length == 4
               ? ['Bored', 'Focused', 'Anxious', 'Overload']
               : ['Focused', 'time pressure', 'Distracted']),

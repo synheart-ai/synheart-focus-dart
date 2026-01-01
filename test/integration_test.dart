@@ -124,9 +124,9 @@ void main() {
       // cognitiveLoad can be derived from stress and task switching
       final cognitiveLoad =
           ((hsiData.stressIndex + behaviorData.taskSwitchRate) / 2.0).clamp(
-            0.0,
-            1.0,
-          );
+        0.0,
+        1.0,
+      );
 
       // clarity can be derived from HRV and engagement
       final clarity = (focusState.focusScore * focusState.confidence).clamp(

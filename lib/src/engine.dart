@@ -27,7 +27,7 @@ class FocusEngine {
 
   /// Callback for logging/debugging
   void Function(String level, String message, {Map<String, dynamic>? context})?
-  onLog;
+      onLog;
 
   /// Model for inference
   OnDeviceModel? _model;
@@ -53,7 +53,7 @@ class FocusEngine {
       StreamController<FocusState>.broadcast();
 
   FocusEngine({FocusConfig? config, this.onLog})
-    : config = config ?? FocusConfig.defaultConfig;
+      : config = config ?? FocusConfig.defaultConfig;
 
   /// Stream of focus state updates (from synheart-focus-dart)
   Stream<FocusState> get onUpdate => _updateController.stream;
@@ -81,7 +81,7 @@ class FocusEngine {
   /// - Distracted: confidence * 40.0 → 0-40
   FocusResult computeScore({
     required Map<String, double>
-    probabilities, // All class probabilities from model
+        probabilities, // All class probabilities from model
     required Map<String, double> features, // Extracted features
     required ModelInfo modelInfo, // Model metadata
   }) {
@@ -166,7 +166,7 @@ class FocusEngine {
     // Apply temporal smoothing if we have previous data
     final smoothedScore = _previousScore != null
         ? (rawScore * (1 - config.smoothingFactor)) +
-              (_previousScore! / 100.0 * config.smoothingFactor)
+            (_previousScore! / 100.0 * config.smoothingFactor)
         : rawScore;
 
     _previousScore = smoothedScore * 100.0;
@@ -290,8 +290,7 @@ class FocusEngine {
     // Compute mean and std from subject history
     final mean =
         _subjectIbiHistory.reduce((a, b) => a + b) / _subjectIbiHistory.length;
-    final variance =
-        _subjectIbiHistory
+    final variance = _subjectIbiHistory
             .map((x) => math.pow(x - mean, 2))
             .reduce((a, b) => a + b) /
         _subjectIbiHistory.length;
@@ -619,8 +618,7 @@ class FocusEngineFactory {
       String level,
       String message, {
       Map<String, dynamic>? context,
-    })?
-    onLog,
+    })? onLog,
   }) {
     return FocusEngine(config: config, onLog: onLog);
   }

@@ -15,16 +15,15 @@ class HrvFeatures {
     if (rrIntervalsMs.length < 2) return 0.0;
 
     // Filter physiologically plausible intervals
-    final validRr = rrIntervalsMs
-        .where((rr) => rr >= 300 && rr <= 2000)
-        .toList();
+    final validRr =
+        rrIntervalsMs.where((rr) => rr >= 300 && rr <= 2000).toList();
 
     if (validRr.length < 2) return 0.0;
 
     final mean = validRr.reduce((a, b) => a + b) / validRr.length;
     final variance =
         validRr.map((x) => pow(x - mean, 2)).reduce((a, b) => a + b) /
-        (validRr.length - 1);
+            (validRr.length - 1);
 
     return sqrt(variance);
   }
@@ -37,9 +36,8 @@ class HrvFeatures {
     if (rrIntervalsMs.length < 2) return 0.0;
 
     // Filter valid intervals
-    final validRr = rrIntervalsMs
-        .where((rr) => rr >= 300 && rr <= 2000)
-        .toList();
+    final validRr =
+        rrIntervalsMs.where((rr) => rr >= 300 && rr <= 2000).toList();
 
     if (validRr.length < 2) return 0.0;
 
@@ -58,9 +56,8 @@ class HrvFeatures {
   static double computePnn50(List<double> rrIntervalsMs) {
     if (rrIntervalsMs.length < 2) return 0.0;
 
-    final validRr = rrIntervalsMs
-        .where((rr) => rr >= 300 && rr <= 2000)
-        .toList();
+    final validRr =
+        rrIntervalsMs.where((rr) => rr >= 300 && rr <= 2000).toList();
 
     if (validRr.length < 2) return 0.0;
 
@@ -100,9 +97,8 @@ class HrvFeatures {
     if (rrIntervalsMs.isEmpty) return 0.0;
 
     // Check physiological plausibility
-    final validCount = rrIntervalsMs
-        .where((rr) => rr >= 300 && rr <= 2000)
-        .length;
+    final validCount =
+        rrIntervalsMs.where((rr) => rr >= 300 && rr <= 2000).length;
     final plausibilityScore = validCount / rrIntervalsMs.length;
 
     if (rrIntervalsMs.length < 2) return plausibilityScore;
@@ -118,7 +114,7 @@ class HrvFeatures {
     final meanDiff = diffs.reduce((a, b) => a + b) / diffs.length;
     final varianceDiff =
         diffs.map((d) => pow(d - meanDiff, 2)).reduce((a, b) => a + b) /
-        diffs.length;
+            diffs.length;
 
     // Consistency score: lower variance = higher quality
     final consistencyScore = 1.0 / (1.0 + sqrt(varianceDiff) / 100.0);
@@ -175,9 +171,8 @@ class HrvFeatures {
       return {'count': 0, 'mean': 0, 'min': 0, 'max': 0, 'std': 0};
     }
 
-    final validRr = rrIntervalsMs
-        .where((rr) => rr >= 300 && rr <= 2000)
-        .toList();
+    final validRr =
+        rrIntervalsMs.where((rr) => rr >= 300 && rr <= 2000).toList();
 
     if (validRr.isEmpty) {
       return {'count': 0, 'mean': 0, 'min': 0, 'max': 0, 'std': 0};
@@ -189,7 +184,7 @@ class HrvFeatures {
 
     final variance =
         validRr.map((x) => pow(x - mean, 2)).reduce((a, b) => a + b) /
-        validRr.length;
+            validRr.length;
     final std = sqrt(variance);
 
     return {

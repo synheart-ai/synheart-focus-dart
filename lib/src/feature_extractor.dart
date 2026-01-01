@@ -141,8 +141,7 @@ class FeatureExtractor {
     if (rrIntervalsMs.length < 2) return 0.0;
 
     final mean = rrIntervalsMs.reduce((a, b) => a + b) / rrIntervalsMs.length;
-    final variance =
-        rrIntervalsMs
+    final variance = rrIntervalsMs
             .map((x) => (x - mean) * (x - mean))
             .reduce((a, b) => a + b) /
         (rrIntervalsMs.length - 1); // Sample std (N-1)
