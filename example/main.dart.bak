@@ -1,0 +1,124 @@
+import 'dart:math';
+import 'package:synheart_focus/synheart_focus.dart';
+
+void main() async {
+  print('Initializing Focus Engine with Gradient Boosting model...\n');
+  
+  // Initialize the FocusEngine with the new model
+  final focusEngine = FocusEngine(
+    config: const FocusConfig(
+      windowSeconds: 60,  // 60-second window for feature extraction
+      stepSeconds: 5,    // 5-second step size
+      minRrCount: 30,    // Minimum RR intervals required
+      enableDebugLogging: true,
+    ),
+  );
+
+  // Initialize the model
+  await focusEngine.initialize(
+    modelPath: 'assets/models/Gradient_Boosting.onnx',
+    backend: 'onnx',
+  );
+
+  print('Model loaded successfully!\n');
+  print('Simulating HR data stream...\n');
+  print('The engine will:');
+  print('  1. Buffer HR data in 60-second windows');
+  print('  2. Convert HR (BPM) to IBI (ms)');
+  print('  3. Apply subject-specific z-score normalization');
+  print('  4. Extract 24 HRV features');
+  print('  5. Run inference with 4-class model (Bored, Focused, Anxious, Overload)\n');
+  print('─────────────────────────────────\n');
+
+  // Simulate HR data stream (similar to Python example)
+  // Generate synthetic HR data over time
+  final random = Random(42);
+  final baseTime = DateTime.now();
+  
+  // Helper to generate Gaussian random numbers (Box-Muller transform)
+  double nextGaussian(Random rng) {
+    double u1 = rng.nextDouble();
+    double u2 = rng.nextDouble();
+    return sqrt(-2 * log(u1)) * cos(2 * pi * u2);
+  }
+  
+  // Simulate different cognitive states
+  // 1. Focused state: HR around 70 BPM with moderate variability
+  print('Phase 1: Focused state (HR ~70 BPM)...');
+  for (int i = 0; i < 100; i++) {
+    final hr = 70 + nextGaussian(random) * 5; // Mean 70, std 5
+    final hrClamped = hr.clamp(50.0, 110.0);
+    final timestamp = baseTime.add(Duration(seconds: i));
+    
+    final result = await focusEngine.inferFromHrData(
+      hrBpm: hrClamped,
+      timestamp: timestamp,
+    );
+    
+    if (result != null) {
+      print('  HR: ${hrClamped.toStringAsFixed(1)} BPM → '
+            'State: ${result.focusState}, '
+            'Score: ${result.focusScore.toStringAsFixed(1)}, '
+            'Confidence: ${(result.confidence * 100).toStringAsFixed(1)}%');
+      print('  Probabilities: ${result.probabilities}');
+    }
+    
+    await Future.delayed(const Duration(milliseconds: 100));
+  }
+
+  print('\n─────────────────────────────────\n');
+  
+  // 2. Anxious state: Higher HR with increased variability
+  print('Phase 2: Anxious state (HR ~90 BPM)...');
+  for (int i = 0; i < 100; i++) {
+    final hr = 90 + nextGaussian(random) * 8; // Mean 90, std 8
+    final hrClamped = hr.clamp(60.0, 120.0);
+    final timestamp = baseTime.add(Duration(seconds: 100 + i));
+    
+    final result = await focusEngine.inferFromHrData(
+      hrBpm: hrClamped,
+      timestamp: timestamp,
+    );
+    
+    if (result != null) {
+      print('  HR: ${hrClamped.toStringAsFixed(1)} BPM → '
+            'State: ${result.focusState}, '
+            'Score: ${result.focusScore.toStringAsFixed(1)}, '
+            'Confidence: ${(result.confidence * 100).toStringAsFixed(1)}%');
+      print('  Probabilities: ${result.probabilities}');
+    }
+    
+    await Future.delayed(const Duration(milliseconds: 100));
+  }
+
+  print('\n─────────────────────────────────\n');
+  
+  // 3. Bored state: Lower HR with low variability
+  print('Phase 3: Bored state (HR ~60 BPM)...');
+  for (int i = 0; i < 100; i++) {
+    final hr = 60 + nextGaussian(random) * 3; // Mean 60, std 3
+    final hrClamped = hr.clamp(45.0, 75.0);
+    final timestamp = baseTime.add(Duration(seconds: 200 + i));
+    
+    final result = await focusEngine.inferFromHrData(
+      hrBpm: hrClamped,
+      timestamp: timestamp,
+    );
+    
+    if (result != null) {
+      print('  HR: ${hrClamped.toStringAsFixed(1)} BPM → '
+            'State: ${result.focusState}, '
+            'Score: ${result.focusScore.toStringAsFixed(1)}, '
+            'Confidence: ${(result.confidence * 100).toStringAsFixed(1)}%');
+      print('  Probabilities: ${result.probabilities}');
+    }
+    
+    await Future.delayed(const Duration(milliseconds: 100));
+  }
+
+  print('\n─────────────────────────────────\n');
+  print('Simulation complete!');
+  
+  // Clean up
+  focusEngine.dispose();
+}
